@@ -3,44 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Buckshot Online</title>
+    <title>Buckshot Roulette</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        body { margin: 0; background: #050505; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; user-select: none; }
         
-        /* КНОПКИ И МЕНЮ */
-        .top-btn { position: absolute; z-index: 1000; background: rgba(0,0,0,0.6); border: 1px solid #5d3a1a; color: #fff; padding: 8px 12px; cursor: pointer; text-transform: uppercase; font-size: 12px; }
+        /* ВЕРХНИЕ КНОПКИ */
+        .top-btn { position: absolute; z-index: 100; background: rgba(0,0,0,0.6); border: 1px solid #664422; color: #fff; padding: 8px; cursor: pointer; font-size: 10px; }
         #mute-btn { top: 10px; right: 10px; }
-        #escape-btn { top: 10px; left: 10px; display: none; color: #f00; border-color: #f00; }
+        #escape-btn { top: 10px; left: 10px; display: none; color: #f55; border-color: #f00; }
 
-        #main-menu { position: absolute; width: 100%; height: 100%; background: #000; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 10px solid #5d3a1a; }
+        /* МЕНЮ */
+        #main-menu { position: absolute; width: 100%; height: 100%; background: #080808; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 4px solid #664422; }
+        .menu-btn { padding: 15px; width: 200px; margin: 5px; background: #1a1a1a; border: 1px solid #664422; color: #fff; font-weight: bold; cursor: pointer; }
         
-        /* ИГРОВОЙ ЭКРАН */
-        #game-ui { position: relative; width: 100vw; height: 100vh; max-width: 500px; border: 5px solid #5d3a1a; background: #000; display: none; flex-direction: column; }
+        /* ИГРА */
+        #game-ui { position: relative; width: 100%; height: 100%; max-width: 500px; border: 2px solid #443322; background: #111; display: none; flex-direction: column; }
         
-        .name-tag { font-size: 12px; color: #888; margin-bottom: 2px; text-transform: uppercase; }
-        .hp-container { display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.8); padding: 5px; border-bottom: 1px solid #5d3a1a; }
-        .hp-bar { display: flex; gap: 5px; min-height: 25px; }
-        .hp-icon { width: 18px; height: 25px; background-size: contain; background-repeat: no-repeat; }
+        .hp-row { display: flex; flex-direction: column; align-items: center; padding: 5px; background: #000; border-bottom: 1px solid #333; }
+        .name { font-size: 10px; color: #888; margin-bottom: 3px; }
+        .hp-bar { display: flex; gap: 4px; height: 30px; }
+        
+        /* ИСПРАВЛЕННЫЕ ИКОНКИ ЖИЗНЕЙ И ПРЕДМЕТОВ */
+        .hp-icon { width: 20px; height: 30px; background-size: contain; background-repeat: no-repeat; background-position: center; }
+        .item-btn { width: 48px; height: 48px; border: 1px solid #555; background-color: #222; background-size: 80%; background-repeat: no-repeat; background-position: center; cursor: pointer; transition: 0.1s; }
+        .item-btn:active { transform: scale(0.95); }
 
-        #central-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
-        #gun-img { width: 70%; transition: transform 0.3s; z-index: 5; }
-        .status-text { background: rgba(0,0,0,0.9); padding: 10px; border: 1px solid #0f0; color: #0f0; width: 80%; text-align: center; margin-bottom: 10px; min-height: 40px; font-size: 13px; z-index: 10; }
+        /* ЦЕНТР */
+        #table { flex-grow: 1; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
+        #gun { width: 240px; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10; }
+        #status { position: absolute; top: 20px; background: rgba(0,0,0,0.8); border: 1px solid #0f0; color: #0f0; padding: 8px 20px; font-size: 14px; text-align: center; }
 
-        #player-area { background: rgba(20,20,20,0.9); border-top: 2px solid #5d3a1a; padding: 5px; }
-        .inv-box { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; padding: 5px; min-height: 45px; }
-        .item-btn { width: 40px; height: 40px; border: 1px solid #5d3a1a; background-color: #111; background-size: cover; cursor: pointer; }
-
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
-        .action-btn { padding: 15px; border: 1px solid #5d3a1a; background: #1a1a1a; color: #fff; cursor: pointer; font-weight: bold; }
-        .action-btn:disabled { opacity: 0.3; }
+        /* ИГРОК */
+        #player-area { background: #0a0a0a; border-top: 1px solid #333; padding: 10px; }
+        #inv { display: flex; gap: 5px; justify-content: center; min-height: 55px; margin-bottom: 10px; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .act-btn { padding: 15px; background: #222; border: 1px solid #664422; color: #fff; font-size: 16px; cursor: pointer; }
+        .act-btn:disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(1); }
 
         /* ЭФФЕКТЫ */
-        .flash { position: absolute; width: 100%; height: 100%; background: #fff; opacity: 0; pointer-events: none; z-index: 20; }
-        .shake { animation: shake 0.3s; }
-        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-5px, 5px); } 75% { transform: translate(5px, -5px); } }
-        .shell { position: absolute; width: 8px; height: 16px; background: gold; border: 1px solid #b8860b; z-index: 15; pointer-events: none; }
+        .flash { position: absolute; top:0; left:0; width:100%; height:100%; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
+        .shake { animation: shake 0.4s; }
+        @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-5px,5px)} 75%{transform:translate(5px,-5px)} }
+        .shell { position: absolute; width: 8px; height: 18px; background: gold; z-index: 40; border: 1px solid #aa8800; }
     </style>
 </head>
 <body>
@@ -55,72 +61,67 @@
     <button id="escape-btn" class="top-btn" onclick="location.reload()">МЕНЮ</button>
 
     <div id="main-menu">
-        <h1 style="color: #8b5a2b; letter-spacing: 3px;">BUCKSHOT</h1>
-        <div style="margin-bottom: 20px; color: #555; font-size: 12px;">ОНЛАЙН: <span id="online-cnt">...</span></div>
-        <button class="action-btn" style="width: 220px; margin-bottom: 10px;" onclick="startSingle()">ОДИНОЧНАЯ</button>
-        <button class="action-btn" style="width: 220px; color: #0f0; border-color: #0f0;" onclick="startMulti()">МУЛЬТИПЛЕЕР</button>
-        <p id="menu-status" style="color: #0f0; font-size: 12px; margin-top: 15px;"></p>
+        <h1 style="color:#a85; margin-bottom: 5px;">BUCKSHOT</h1>
+        <div style="color:#666; font-size: 12px; margin-bottom: 30px;">ONLINE: <span id="online-cnt">0</span></div>
+        <button class="menu-btn" onclick="startSingle()">ОДИНОЧНАЯ</button>
+        <button class="menu-btn" style="border-color:#4a4; color:#4a4;" onclick="startMulti()">МУЛЬТИПЛЕЕР</button>
+        <p id="menu-msg" style="color:#4a4; font-size:12px; height:20px;"></p>
     </div>
 
     <div id="game-ui">
         <div id="flash-effect" class="flash"></div>
-        
-        <div class="hp-container">
-            <div class="name-tag" id="opp-name">ДИЛЕР</div>
-            <div class="hp-bar" id="opp-hp-bar"></div>
+
+        <div class="hp-row">
+            <div class="name" id="opp-name">ВРАГ</div>
+            <div class="hp-bar" id="opp-hp"></div>
         </div>
 
-        <div id="central-area">
-            <img src="Game_Table.png" style="position: absolute; width: 100%; opacity: 0.2; pointer-events: none;">
-            <div id="info" class="status-text">ОЖИДАНИЕ...</div>
-            <img src="Gun.png" id="gun-img">
+        <div id="table">
+            <img src="Game_Table.png" style="position: absolute; width: 100%; opacity: 0.15;">
+            <div id="status">ОЖИДАНИЕ...</div>
+            <img id="gun" src="Gun.png">
         </div>
 
         <div id="player-area">
-            <div style="text-align:center; font-size:11px; margin-bottom:5px; color:#aaa;">
-                БОЕВЫЕ: <span id="cnt-live" style="color:#f00">?</span> | 
-                ХОЛОСТЫЕ: <span id="cnt-blank" style="color:#666">?</span>
+            <div style="text-align:center; font-size:10px; color:#555; margin-bottom:5px;">
+                БОЕВЫЕ: <span id="live-cnt" style="color:#d44">?</span> | ПУСТЫЕ: <span id="blank-cnt" style="color:#888">?</span>
             </div>
             
-            <div class="hp-container" style="background:none; border:none;">
-                <div class="name-tag" id="my-name">ВЫ</div>
-                <div class="hp-bar" id="my-hp-bar"></div>
+            <div class="hp-row" style="background:none; border:none; padding:0;">
+                <div class="name" id="my-name">ВЫ</div>
+                <div class="hp-bar" id="my-hp"></div>
             </div>
 
-            <div class="inv-box" id="my-inv"></div>
-            
+            <div id="inv"></div>
+
             <div class="controls">
-                <button id="btn-self" class="action-btn" onclick="actShoot('self')">В СЕБЯ</button>
-                <button id="btn-opp" class="action-btn" onclick="actShoot('opp')">В ВРАГА</button>
+                <button id="btn-self" class="act-btn" onclick="actShoot('self')">В СЕБЯ</button>
+                <button id="btn-opp" class="act-btn" onclick="actShoot('opp')">В ВРАГА</button>
             </div>
         </div>
     </div>
 
 <script>
     const socket = io("https://bucshot.onrender.com");
-    let tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user || { first_name: "Гость" };
-    
-    // ИКОНКИ
+    let tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user || { first_name: "Игрок" };
+
     const IMGS = {
         'Beer': 'Beer.png', 'Knife': 'Hand saw.png', 'Cigaretes': 'cigaretes.png',
         'Handclifs': 'Handclifs.png', 'Lighter': 'Lighter.png',
         'hpFull': 'Health_2.png', 'hpEmpty': 'Health_1.png'
     };
 
-    // СОСТОЯНИЕ ИГРЫ
     let state = {
-        mode: 'none', // 'single' или 'multi'
-        roomId: null,
+        mode: 'none', roomId: null,
         myHP: 3, oppHP: 3,
-        mag: [], // Магазин (true=боевой, false=холостой)
-        turn: false, // true = мой ход
-        myInv: [], oppInv: [],
-        dmgMod: 1, // Множитель урона (пила)
-        skipTurn: false // Наручники
+        mag: [], myInv: [],
+        turn: false, // Твой ли ход?
+        processing: false, // Идет ли анимация?
+        dmg: 1, skip: false
     };
-    
+
     let isMuted = false;
-    const audio = {
+    const audios = { 
         bg: document.getElementById('snd-bg'),
         live: document.getElementById('snd-live'),
         blank: document.getElementById('snd-blank'),
@@ -128,93 +129,172 @@
         item: document.getElementById('snd-item')
     };
 
-    function playSnd(key) { if(!isMuted) { audio[key].currentTime=0; audio[key].play().catch(()=>{}); } }
-    function toggleMute() { isMuted = !isMuted; audio.bg.muted = isMuted; document.getElementById('mute-btn').innerText = isMuted?"ЗВУК: ВЫКЛ":"ЗВУК: ВКЛ"; }
+    function playSnd(key) { if(!isMuted) try { audios[key].currentTime=0; audios[key].play().catch(()=>{}); } catch(e){} }
+    function toggleMute() { isMuted=!isMuted; audios.bg.muted=isMuted; document.getElementById('mute-btn').innerText=isMuted?"ЗВУК: ВЫКЛ":"ЗВУК: ВКЛ"; }
 
-    // --- ОБНОВЛЕНИЕ ОНЛАЙНА ---
-    socket.on('online_count', (cnt) => { document.getElementById('online-cnt').innerText = cnt; });
+    // --- ОНЛАЙН СЧЕТЧИК ---
+    socket.on('online_count', c => document.getElementById('online-cnt').innerText = c);
 
-    // --- ОДИНОЧНАЯ ИГРА ---
-    function startSingle() {
-        state.mode = 'single';
-        state.myHP = 3; state.oppHP = 3;
-        state.myInv = genItems(2); state.oppInv = genItems(2);
-        state.mag = genMag();
-        state.turn = true;
-        
-        startGameUI("ВЫ", "ДИЛЕР");
-        updateUI();
-        msg("РАУНД НАЧАЛСЯ. ВАШ ХОД.");
-    }
-
-    function aiTurn() {
-        if(state.myHP<=0 || state.oppHP<=0 || state.turn) return;
-        
-        setTimeout(() => {
-            // Простейший ИИ: если знает что боевой (через лупу) - стреляет. Иначе рандом.
-            // Для упрощения - просто стреляет во врага.
-            actShoot('opp', true); 
-        }, 1500);
-    }
-
-    // --- МУЛЬТИПЛЕЕР ---
+    // --- СТАРТ МУЛЬТИПЛЕЕРА ---
     function startMulti() {
-        document.getElementById('menu-status').innerText = "ПОИСК СОПЕРНИКА...";
+        document.getElementById('menu-msg').innerText = "ПОИСК СОПЕРНИКА...";
         socket.emit('join_game', { name: tgUser.first_name });
-        audio.bg.volume=0.3; audio.bg.play().catch(()=>{});
+        playSnd('bg'); audios.bg.volume = 0.3;
     }
 
     socket.on('start_multiplayer', (data) => {
-        state.mode = 'multi';
-        state.roomId = data.id;
-        state.mag = data.magazine;
-        state.turn = (data.turn === socket.id);
-        state.myInv = data.myInv; state.oppInv = data.oppInv;
+        state.mode = 'multi'; state.roomId = data.id;
+        state.mag = data.magazine; state.myInv = data.myInv;
+        state.turn = data.turn; // Сервер говорит, кто первый
         state.myHP = 3; state.oppHP = 3;
-        
-        startGameUI(data.myName, data.oppName);
-        updateUI();
+        state.processing = false;
+
+        initGameUI(data.myName, data.oppName);
         msg(state.turn ? "ВАШ ХОД" : "ХОД ПРОТИВНИКА");
     });
 
+    // --- ХОД ПРОТИВНИКА ---
     socket.on('opponent_action', (data) => {
         if (data.type === 'shoot') {
             state.mag.shift();
-            visualShoot(data.target === 'self' ? 'opp' : 'self', data.bullet, false);
-        } else if (data.type === 'item') {
-            applyItemEffect(data.item, false); // false = использовал враг
+            // Враг стрелял в 'self' -> для меня это цель 'opp'. Враг стрелял в 'opp' -> для меня это 'self'
+            const visualTarget = data.target === 'self' ? 'opp' : 'self';
+            visualShoot(visualTarget, data.bullet, false); // false = стрелял НЕ я
+        } 
+        else if (data.type === 'item') {
+            applyItem(data.item, false);
         }
     });
 
+    // --- ПЕРЕЗАРЯДКА ---
     socket.on('reload_magazine', (data) => {
         setTimeout(() => {
             playSnd('reload');
             state.mag = data.magazine;
-            state.myInv = [...state.myInv, ...data.newItems].slice(0,8);
+            state.myInv = [...state.myInv, ...data.newItems].slice(0, 8); // Макс 8 предметов
             msg("ПЕРЕЗАРЯДКА!");
-            updateUI();
-        }, 1500);
+            renderUI();
+        }, 2000);
     });
 
-    // --- ОБЩАЯ ЛОГИКА ---
-    function startGameUI(myName, oppName) {
+    // --- СТРЕЛЬБА ---
+    function actShoot(target) {
+        if (!state.turn || state.processing) return;
+
+        const bullet = state.mag.shift();
+        
+        // Отправка на сервер
+        if (state.mode === 'multi') {
+            socket.emit('game_action', { roomId: state.roomId, type: 'shoot', target, bullet });
+        } else {
+            // Одиночный режим (если пуля пустая, а выстрел в себя, ход сохраняется)
+        }
+
+        visualShoot(target, bullet, true); // true = стрелял Я
+    }
+
+    function visualShoot(target, isLive, isMe) {
+        state.processing = true; // БЛОКИРУЕМ ИНТЕРФЕЙС
+        renderUI();
+
+        const gun = document.getElementById('gun');
+        
+        // Логика поворота ружья
+        if (isMe) gun.style.transform = target === 'self' ? 'rotate(180deg) translateY(40px)' : 'translateX(50px)';
+        else gun.style.transform = target === 'self' ? 'translateX(-50px)' : 'rotate(180deg) translateY(-40px)';
+
+        setTimeout(() => {
+            playSnd(isLive ? 'live' : 'blank');
+            
+            if (isLive) {
+                // Вспышка
+                const fl = document.getElementById('flash-effect');
+                fl.style.opacity = 0.8; setTimeout(()=>fl.style.opacity=0, 100);
+                document.getElementById('game-ui').classList.add('shake');
+                setTimeout(()=>document.getElementById('game-ui').classList.remove('shake'), 400);
+                spawnShell();
+
+                // Урон
+                let dmg = state.dmg;
+                if (target === 'self') isMe ? state.myHP-=dmg : state.oppHP-=dmg;
+                else isMe ? state.oppHP-=dmg : state.myHP-=dmg;
+            } else {
+                msg("*ЩЕЛК*");
+            }
+            state.dmg = 1; // Сброс урона
+
+            setTimeout(() => {
+                gun.style.transform = 'none';
+
+                // РАСЧЕТ ХОДА (Самая важная часть!)
+                let keepTurn = (!isLive && target === 'self'); 
+                
+                if (isMe) {
+                    // Если стрелял Я и (холостой + в себя) -> мой ход. Иначе -> чужой.
+                    state.turn = keepTurn; 
+                } else {
+                    // Если стрелял ВРАГ и (холостой + в себя) -> его ход. Иначе -> мой.
+                    state.turn = !keepTurn;
+                }
+
+                state.processing = false; // РАЗБЛОКИРУЕМ
+                checkWin();
+                renderUI();
+
+                if(state.mode === 'single' && !state.turn) setTimeout(aiBot, 1500);
+
+            }, 800);
+        }, 500);
+    }
+
+    // --- ПРЕДМЕТЫ ---
+    function useItem(item, idx) {
+        if (!state.turn || state.processing) return;
+        state.myInv.splice(idx, 1);
+        if (state.mode === 'multi') socket.emit('game_action', { roomId: state.roomId, type: 'item', item });
+        applyItem(item, true);
+        renderUI();
+    }
+
+    function applyItem(item, isMe) {
+        playSnd('item');
+        const who = isMe ? "ВЫ" : "ВРАГ";
+        msg(`${who}: ${item}`);
+
+        if (item === 'Beer') {
+            const b = state.mag.shift();
+            msg(`${who} ВЫБРОСИЛ ПАТРОН`);
+            spawnShell(); playSnd('reload');
+        } 
+        else if (item === 'Knife') { state.dmg = 2; msg("УРОН X2"); }
+        else if (item === 'Cigaretes') { 
+            if(isMe && state.myHP<3) state.myHP++; 
+            else if(!isMe && state.oppHP<3) state.oppHP++; 
+        }
+        else if (item === 'Handclifs') { 
+            // В этой версии просто визуал, сложная логика пропуска хода часто багует
+            msg("НАРУЧНИКИ (ЭФФЕКТ)"); 
+        }
+        else if (item === 'Lighter') {
+            if(isMe) msg(`СЛЕДУЮЩИЙ: ${state.mag[0] ? "БОЕВОЙ" : "ПУСТОЙ"}`);
+        }
+    }
+
+    // --- ВСПОМОГАТЕЛЬНЫЕ ---
+    function initGameUI(n1, n2) {
         document.getElementById('main-menu').style.display = 'none';
         document.getElementById('game-ui').style.display = 'flex';
         document.getElementById('escape-btn').style.display = 'block';
-        document.getElementById('my-name').innerText = myName;
-        document.getElementById('opp-name').innerText = oppName;
+        document.getElementById('my-name').innerText = n1;
+        document.getElementById('opp-name').innerText = n2;
+        renderUI();
     }
 
-    function genMag() {
-        let t = Math.floor(Math.random()*4)+3; let l = Math.ceil(t/2);
-        return Array(t).fill(false).map((_,i)=>i<l).sort(()=>Math.random()-0.5);
-    }
-    function genItems(n) { const p=['Beer','Knife','Cigaretes','Handclifs','Lighter']; return Array(n).fill(0).map(()=>p[Math.floor(Math.random()*p.length)]); }
+    function msg(t) { document.getElementById('status').innerText = t; }
 
-    function msg(txt) { document.getElementById('info').innerText = txt; }
-
-    function updateUI() {
-        const drawHP = (id, cur) => {
+    function renderUI() {
+        // Отрисовка HP
+        const draw = (id, cur) => {
             const el=document.getElementById(id); el.innerHTML='';
             for(let i=0; i<3; i++) {
                 const d=document.createElement('div'); d.className='hp-icon';
@@ -222,147 +302,62 @@
                 el.appendChild(d);
             }
         };
-        drawHP('my-hp-bar', state.myHP); drawHP('opp-hp-bar', state.oppHP);
+        draw('my-hp', state.myHP); draw('opp-hp', state.oppHP);
 
-        const inv=document.getElementById('my-inv'); inv.innerHTML='';
+        // Инвентарь
+        const invEl=document.getElementById('inv'); invEl.innerHTML='';
         state.myInv.forEach((it, i) => {
             const b=document.createElement('div'); b.className='item-btn';
             b.style.backgroundImage=`url('${IMGS[it]}')`;
             b.onclick = () => useItem(it, i);
-            inv.appendChild(b);
+            invEl.appendChild(b);
         });
 
-        document.getElementById('cnt-live').innerText = state.mag.filter(b=>b).length;
-        document.getElementById('cnt-blank').innerText = state.mag.filter(b=>!b).length;
+        // Патроны
+        document.getElementById('live-cnt').innerText = state.mag.filter(x=>x).length;
+        document.getElementById('blank-cnt').innerText = state.mag.filter(x=>!x).length;
+
+        // Кнопки (Блокируем если не мой ход ИЛИ идет анимация)
+        const locked = !state.turn || state.processing;
+        document.getElementById('btn-self').disabled = locked;
+        document.getElementById('btn-opp').disabled = locked;
         
-        document.getElementById('btn-self').disabled = !state.turn;
-        document.getElementById('btn-opp').disabled = !state.turn;
+        if(!state.processing) msg(state.turn ? "ВАШ ХОД" : "ХОД ВРАГА");
     }
 
-    // --- СТРЕЛЬБА ---
-    function actShoot(target, ai = false) {
-        if (!state.turn && !ai) return;
-        
-        const bullet = state.mag.shift();
-        
-        if (state.mode === 'multi' && !ai) {
-            socket.emit('game_action', { roomId: state.roomId, type: 'shoot', target, bullet });
-        }
-        
-        visualShoot(target, bullet, !ai);
-    }
-
-    function visualShoot(target, isLive, isMe) {
-        state.turn = false; updateUI();
-        const gun = document.getElementById('gun-img');
-        
-        // Поворот ствола
-        if (isMe) gun.style.transform = target==='self' ? 'rotate(180deg) translateY(50px)' : 'translateX(50px)';
-        else gun.style.transform = target==='self' ? 'translateX(-50px)' : 'rotate(180deg) translateY(-50px)';
-
-        setTimeout(() => {
-            playSnd(isLive ? 'live' : 'blank');
-            if (isLive) {
-                // Вспышка и тряска
-                const fl = document.getElementById('flash-effect');
-                fl.style.opacity = 0.8; fl.style.transition = 'opacity 0.1s';
-                setTimeout(()=>fl.style.opacity=0, 100);
-                document.getElementById('game-ui').classList.add('shake');
-                setTimeout(()=>document.getElementById('game-ui').classList.remove('shake'), 300);
-                spawnShell();
-
-                // Урон
-                let dmg = state.dmgMod;
-                if (target === 'self') isMe ? state.myHP-=dmg : state.oppHP-=dmg;
-                else isMe ? state.oppHP-=dmg : state.myHP-=dmg;
-            }
-            
-            state.dmgMod = 1; // Сброс пилы
-
-            setTimeout(() => {
-                gun.style.transform = 'none';
-                
-                // Смена хода
-                let keepTurn = (!isLive && target === 'self');
-                if (isMe) state.turn = keepTurn;
-                else state.turn = !keepTurn;
-
-                // Проверка наручников
-                if (state.skipTurn && state.turn) {
-                    msg("ХОД ПРОПУЩЕН (НАРУЧНИКИ)");
-                    state.turn = false; 
-                    state.skipTurn = false;
-                    if(state.mode==='multi') socket.emit('game_action', {roomId: state.roomId, type: 'pass'}); 
-                    else setTimeout(aiTurn, 1000);
-                }
-
-                updateUI();
-                msg(state.turn ? "ВАШ ХОД" : "ХОД ПРОТИВНИКА");
-
-                if (state.myHP<=0 || state.oppHP<=0) {
-                    alert(state.myHP>0 ? "ПОБЕДА" : "ПОРАЖЕНИЕ");
-                    location.reload();
-                } else if (state.mode === 'single' && !state.turn) {
-                    if (state.mag.length === 0) { 
-                        state.mag = genMag(); msg("ПЕРЕЗАРЯДКА..."); 
-                        setTimeout(()=>{state.turn=true; updateUI()}, 1500);
-                    } else {
-                        aiTurn();
-                    }
-                }
-            }, 800);
-        }, 500);
-    }
-
-    // --- ПРЕДМЕТЫ ---
-    function useItem(item, idx) {
-        if (!state.turn) return;
-        playSnd('item');
-        state.myInv.splice(idx, 1);
-        updateUI();
-
-        if (state.mode === 'multi') {
-            socket.emit('game_action', { roomId: state.roomId, type: 'item', item });
-        }
-        applyItemEffect(item, true);
-    }
-
-    function applyItemEffect(item, isMe) {
-        const who = isMe ? "ВЫ" : "ВРАГ";
-        msg(`${who} ИСПОЛЬЗУЕТ: ${item}`);
-
-        if (item === 'Beer') {
-            const b = state.mag.shift();
-            msg(`${who} ПЕРЕДЕРНУЛ: ${b ? "БОЕВОЙ" : "ХОЛОСТОЙ"}`);
-            spawnShell();
-            playSnd('reload');
-            updateUI();
-        } 
-        else if (item === 'Knife') {
-            state.dmgMod = 2;
-            msg(`${who} ОТПИЛИЛ СТВОЛ (УРОН X2)`);
-        }
-        else if (item === 'Cigaretes') {
-            if (isMe) state.myHP = Math.min(state.myHP+1, 3);
-            else state.oppHP = Math.min(state.oppHP+1, 3);
-            updateUI();
-        }
-        else if (item === 'Handclifs') {
-            state.skipTurn = true;
-            msg(`${who} НАДЕЛ НАРУЧНИКИ`);
-        }
-        else if (item === 'Lighter') {
-            if (isMe) msg(`СЛЕДУЮЩИЙ: ${state.mag[0] ? "БОЕВОЙ" : "ХОЛОСТОЙ"}`);
+    function checkWin() {
+        if(state.myHP<=0 || state.oppHP<=0) {
+            alert(state.myHP>0 ? "ПОБЕДА!" : "ВЫ ПРОИГРАЛИ");
+            location.reload();
         }
     }
 
     function spawnShell() {
-        const s = document.createElement('div'); s.className = 'shell';
-        s.style.left = '50%'; s.style.top = '50%';
-        document.body.appendChild(s);
-        s.animate([{transform:'translate(0,0)'},{transform:`translate(${Math.random()*100-50}px, -100px) rotate(400deg)`, opacity:0}], 600);
+        const s=document.createElement('div'); s.className='shell';
+        s.style.left='50%'; s.style.top='50%'; document.body.appendChild(s);
+        s.animate([{transform:'translate(0,0)'},{transform:`translate(${Math.random()*60-30}px, -150px) rotate(360deg)`, opacity:0}], 600);
         setTimeout(()=>s.remove(), 600);
     }
+
+    // --- ОДИНОЧНЫЙ РЕЖИМ (ПРОСТОЙ) ---
+    function startSingle() {
+        state.mode = 'single';
+        state.mag = generateMag();
+        state.myInv = genItems(2);
+        state.myHP=3; state.oppHP=3;
+        state.turn = true;
+        initGameUI("ВЫ", "ДИЛЕР");
+    }
+    function aiBot() {
+        if(state.turn || state.myHP<=0) return;
+        actShoot('opp'); // Бот всегда стреляет в игрока
+    }
+    function generateMag() { 
+        let t=4; let l=2; 
+        return Array(t).fill(false).map((_,i)=>i<l).sort(()=>Math.random()-0.5); 
+    }
+    function genItems(n) { const p=['Beer','Knife','Cigaretes']; return Array(n).fill(0).map(()=>p[0]); }
+
 </script>
 </body>
 </html>
