@@ -7,73 +7,82 @@ app.use(express.static(__dirname));
 
 let waitingPlayer = null;
 let rooms = {};
+let onlineCount = 0;
 const ITEMS_POOL = ['Beer', 'Knife', 'Cigaretes', 'Handclifs', 'Lighter'];
 
 io.on('connection', (socket) => {
+    onlineCount++;
+    io.emit('update_online', onlineCount);
+
     socket.on('join_game', () => {
+        // Если уже есть ждущий игрок и это не мы сами
         if (waitingPlayer && waitingPlayer.id !== socket.id) {
             const roomId = `room_${waitingPlayer.id}_${socket.id}`;
-            const p1Id = waitingPlayer.id;
-            const p2Id = socket.id;
+            const p1 = waitingPlayer;
+            const p2 = socket;
 
             rooms[roomId] = {
-                players: [p1Id, p2Id],
+                players: [p1.id, p2.id],
                 round: 1,
                 magazine: generateMagazine(),
-                hp: { [p1Id]: 3, [p2Id]: 3 },
-                inv: { [p1Id]: generateItems(4), [p2Id]: generateItems(4) },
-                turn: p1Id,
+                hp: { [p1.id]: 3, [p2.id]: 3 },
+                inv: { [p1.id]: generateItems(4), [p2.id]: generateItems(4) },
+                turn: p1.id,
                 dmg: 1
             };
 
-            socket.join(roomId);
-            waitingPlayer.join(roomId);
+            p1.join(roomId);
+            p2.join(roomId);
 
-            io.to(p1Id).emit('init_game', { roomId, myInv: rooms[roomId].inv[p1Id], oppInv: rooms[roomId].inv[p2Id], turn: true });
-            io.to(p2Id).emit('init_game', { roomId, myInv: rooms[roomId].inv[p2Id], oppInv: rooms[roomId].inv[p1Id], turn: false });
+            io.to(p1.id).emit('init_game', { roomId, myInv: rooms[roomId].inv[p1.id], oppInv: rooms[roomId].inv[p2.id], turn: true, mode: 'multi' });
+            io.to(p2.id).emit('init_game', { roomId, myInv: rooms[roomId].inv[p2.id], oppInv: rooms[roomId].inv[p1.id], turn: false, mode: 'multi' });
             waitingPlayer = null;
         } else {
             waitingPlayer = socket;
+            socket.emit('waiting', "ПОИСК ИГРОКА...");
         }
     });
 
     socket.on('game_action', (data) => {
         const room = rooms[data.roomId];
         if (!room || room.turn !== socket.id) return;
+        processAction(data.roomId, socket.id, data);
+    });
 
-        if (data.type === 'shoot') {
-            const isLive = room.magazine.shift();
-            let nextTurn = room.turn;
-
-            if (isLive) {
-                const victimId = data.target === 'self' ? socket.id : room.players.find(id => id !== socket.id);
-                room.hp[victimId] -= room.dmg;
-                nextTurn = room.players.find(id => id !== socket.id);
-            } else {
-                if (data.target === 'opp') nextTurn = room.players.find(id => id !== socket.id);
-            }
-
-            room.dmg = 1; 
-            room.turn = nextTurn;
-            io.to(data.roomId).emit('action_result', {
-                type: 'shoot', actor: socket.id, target: data.target, isLive, hp: room.hp, nextTurn
-            });
-            checkState(data.roomId);
-
-        } else if (data.type === 'item') {
-            const idx = room.inv[socket.id].indexOf(data.item);
-            if (idx === -1) return;
-            room.inv[socket.id].splice(idx, 1);
-
-            let logData = { item: data.item, actor: socket.id };
-            if (data.item === 'Beer') logData.extra = room.magazine.shift();
-            if (data.item === 'Knife') room.dmg = 2;
-            if (data.item === 'Cigaretes') room.hp[socket.id] = Math.min(3, room.hp[socket.id] + 1);
-
-            io.to(data.roomId).emit('action_result', { type: 'item', logData, hp: room.hp });
-        }
+    socket.on('disconnect', () => {
+        onlineCount--;
+        io.emit('update_online', onlineCount);
+        if (waitingPlayer && waitingPlayer.id === socket.id) waitingPlayer = null;
     });
 });
+
+function processAction(roomId, playerId, data) {
+    const room = rooms[roomId];
+    if (data.type === 'shoot') {
+        const isLive = room.magazine.shift();
+        let nextTurn = room.turn;
+        if (isLive) {
+            const victimId = data.target === 'self' ? playerId : room.players.find(id => id !== playerId);
+            room.hp[victimId] -= room.dmg;
+            nextTurn = room.players.find(id => id !== playerId);
+        } else {
+            if (data.target === 'opp') nextTurn = room.players.find(id => id !== playerId);
+        }
+        room.dmg = 1; room.turn = nextTurn;
+        io.to(roomId).emit('action_result', { type: 'shoot', actor: playerId, target: data.target, isLive, hp: room.hp, nextTurn });
+        checkState(roomId);
+    } else if (data.type === 'item') {
+        const idx = room.inv[playerId].indexOf(data.item);
+        if (idx > -1) {
+            room.inv[playerId].splice(idx, 1);
+            let logData = { item: data.item, actor: playerId };
+            if (data.item === 'Beer') logData.extra = room.magazine.shift();
+            if (data.item === 'Knife') room.dmg = 2;
+            if (data.item === 'Cigaretes') room.hp[playerId] = Math.min(3, room.hp[playerId] + 1);
+            io.to(roomId).emit('action_result', { type: 'item', logData, hp: room.hp });
+        }
+    }
+}
 
 function checkState(roomId) {
     const room = rooms[roomId];
@@ -87,7 +96,7 @@ function checkState(roomId) {
         } else {
             room.hp = { [room.players[0]]: 3, [room.players[1]]: 3 };
             room.magazine = generateMagazine();
-            io.to(roomId).emit('next_round', { round: room.round, mag: room.magazine, hp: room.hp });
+            io.to(roomId).emit('next_round', { round: room.round, hp: room.hp });
         }
     } else if (room.magazine.length === 0) {
         room.magazine = generateMagazine();
@@ -101,5 +110,4 @@ function generateMagazine() {
 }
 function generateItems(n) { return Array(n).fill(0).map(() => ITEMS_POOL[Math.floor(Math.random() * ITEMS_POOL.length)]); }
 
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+http.listen(process.env.PORT || 3000);
