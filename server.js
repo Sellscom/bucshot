@@ -12,56 +12,67 @@ app.use(express.static(__dirname));
 let waitingPlayer = null;
 let rooms = {};
 
-const ITEM_LIST = ['Beer', 'Knife', 'Cigaretes', 'Handclifs', 'Lighter'];
+const ITEMS = ['Beer', 'Knife', 'Cigaretes', 'Handclifs', 'Lighter'];
 
 io.on('connection', (socket) => {
     socket.on('join_game', () => {
         if (waitingPlayer && waitingPlayer.id !== socket.id) {
             const roomId = `room_${waitingPlayer.id}_${socket.id}`;
-            const magazine = generateMagazine();
-            const p1Inv = generateItems(3);
-            const p2Inv = generateItems(3);
+            const gameData = generateRoundData();
             
-            rooms[roomId] = { 
-                players: [waitingPlayer.id, socket.id], 
-                magazine: magazine, 
-                turn: waitingPlayer.id 
+            rooms[roomId] = {
+                players: [waitingPlayer.id, socket.id],
+                magazine: gameData.magazine,
+                turn: waitingPlayer.id
             };
-            
+
             socket.join(roomId);
             waitingPlayer.join(roomId);
 
-            // Отправляем начальные данные обоим
-            io.to(waitingPlayer.id).emit('start_multiplayer', { 
-                id: roomId, magazine, turn: waitingPlayer.id, myInv: p1Inv, oppInv: p2Inv 
+            io.to(waitingPlayer.id).emit('start_multiplayer', {
+                id: roomId, magazine: gameData.magazine, turn: waitingPlayer.id, myInv: generateItems(2), oppInv: generateItems(2)
             });
-            io.to(socket.id).emit('start_multiplayer', { 
-                id: roomId, magazine, turn: waitingPlayer.id, myInv: p2Inv, oppInv: p1Inv 
+            io.to(socket.id).emit('start_multiplayer', {
+                id: roomId, magazine: gameData.magazine, turn: waitingPlayer.id, myInv: generateItems(2), oppInv: generateItems(2)
             });
-            
             waitingPlayer = null;
         } else {
             waitingPlayer = socket;
-            socket.emit('waiting', 'ПОИСК СОПЕРНИКА...');
+            socket.emit('waiting', 'ПОИСК ИГРОКА...');
         }
     });
 
     socket.on('make_move', (data) => {
-        // Пересылаем ход оппоненту
-        socket.to(data.roomId).emit('opponent_move', data);
-    });
+        const room = rooms[data.roomId];
+        if (!room) return;
 
-    socket.on('disconnect', () => { if (waitingPlayer === socket) waitingPlayer = null; });
+        // Если патроны кончились, сервер генерирует новые и отправляет событие перезарядки
+        room.magazine.shift();
+        
+        socket.to(data.roomId).emit('opponent_move', data);
+
+        if (room.magazine.length === 0) {
+            const newData = generateRoundData();
+            room.magazine = newData.magazine;
+            setTimeout(() => {
+                io.to(data.roomId).emit('reload_magazine', {
+                    magazine: room.magazine,
+                    newItems: generateItems(2)
+                });
+            }, 1500);
+        }
+    });
 });
 
-function generateMagazine() {
-    let total = Math.floor(Math.random() * 4) + 4;
+function generateRoundData() {
+    let total = Math.floor(Math.random() * 4) + 3;
     let live = Math.ceil(total / 2);
-    return Array(total).fill(false).map((_, i) => i < live).sort(() => Math.random() - 0.5);
+    let mag = Array(total).fill(false).map((_, i) => i < live).sort(() => Math.random() - 0.5);
+    return { magazine: mag };
 }
 
-function generateItems(count) {
-    return Array(count).fill(null).map(() => ITEM_LIST[Math.floor(Math.random() * ITEM_LIST.length)]);
+function generateItems(n) {
+    return Array(n).fill(null).map(() => ITEMS[Math.floor(Math.random() * ITEMS.length)]);
 }
 
-http.listen(process.env.PORT || 3000, () => console.log('Server running'));
+http.listen(process.env.PORT || 3000, () => console.log('Server OK'));
