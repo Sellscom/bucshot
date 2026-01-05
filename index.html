@@ -3,190 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Buckshot Online</title>
+    <title>Buckshot Online Final</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; }
-        .screen { position: absolute; inset: 0; background: #000; z-index: 300; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 8px solid #5d3a1a; box-sizing: border-box; }
+        .screen { position: absolute; inset: 0; background: #000; z-index: 300; display: none; flex-direction: column; align-items: center; justify-content: center; border: 8px solid #5d3a1a; box-sizing: border-box; }
         #main-menu { display: flex; }
-        .btn { padding: 15px; width: 240px; margin: 10px; background: #1a1a1a; border: 2px solid #5d3a1a; color: #fff; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        #game-ui { position: relative; width: 100%; height: 100%; max-width: 500px; display: none; flex-direction: column; background: #0a0a0a; border: 2px solid #332211; }
-        .top-nav { width: 100%; display: flex; justify-content: space-between; padding: 10px; background: #111; box-sizing: border-box; }
-        #game-log { position: absolute; top: 70px; width: 90%; left: 5%; background: rgba(0,0,0,0.9); border: 2px solid #5d3a1a; color: #0f0; padding: 10px; font-size: 13px; text-align: center; z-index: 100; min-height: 40px; }
+        .btn { padding: 15px; width: 220px; margin: 10px; background: #1a1a1a; border: 2px solid #5d3a1a; color: #fff; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        #game-ui { position: relative; width: 100%; height: 100%; max-width: 500px; display: none; flex-direction: column; }
+        .nav { width: 100%; display: flex; justify-content: space-between; padding: 10px; background: #111; box-sizing: border-box; }
+        #game-log { position: absolute; top: 70px; width: 90%; left: 5%; background: rgba(0,0,0,0.9); border: 1px solid #5d3a1a; color: #0f0; padding: 8px; text-align: center; z-index: 100; font-size: 13px; }
         #table { flex-grow: 1; position: relative; display: flex; justify-content: center; align-items: center; background: url('Game_Table.png') center/cover; }
-        #gun { width: 75%; transition: transform 0.4s; z-index: 10; }
+        #gun { width: 70%; transition: transform 0.4s; z-index: 10; }
         #player-panel { background: #000; padding: 15px; border-top: 2px solid #5d3a1a; }
-        .inv { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 50px; margin: 10px 0; }
-        .item-btn { width: 45px; height: 45px; border: 1px solid #5d3a1a; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #111; }
-        .hp-bar { display: flex; gap: 4px; height: 25px; }
+        .hp-bar { display: flex; gap: 4px; height: 25px; margin: 5px 0; }
         .hp-icon { width: 18px; height: 25px; background-size: contain; background-repeat: no-repeat; }
-        .flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 100; pointer-events: none; }
-        .dmg-badge { color: red; position: absolute; bottom: 20px; right: 20px; font-weight: bold; display: none; }
+        .inv { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; min-height: 45px; margin-bottom: 10px; }
+        .item-btn { width: 40px; height: 40px; border: 1px solid #5d3a1a; background-size: contain; background-repeat: no-repeat; background-position: center; }
+        .flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 200; pointer-events: none; }
+        #dmg-x2 { color: red; position: absolute; bottom: 20px; right: 20px; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
 
     <div id="main-menu" class="screen">
-        <h1 style="color:#8b5a2b;">BUCKSHOT ONLINE</h1>
-        <button class="btn" onclick="startMulti()">МУЛЬТИПЛЕЕР</button>
-        <button class="btn" onclick="startSingle()">ОДИНОЧКА</button>
+        <h1 style="color:#8b5a2b">BUCKSHOT ROULETTE</h1>
+        <button class="btn" onclick="join()">ИГРАТЬ ОНЛАЙН</button>
     </div>
 
-    <div id="game-over-screen" class="screen">
-        <h1 id="over-title"></h1>
-        <p id="over-msg"></p>
+    <div id="end-screen" class="screen">
+        <h1 id="end-title"></h1>
         <button class="btn" onclick="location.reload()">В МЕНЮ</button>
     </div>
 
     <div id="game-ui">
-        <div id="flash-effect" class="flash"></div>
-        <div class="top-nav">
+        <div id="flash" class="flash"></div>
+        <div class="nav">
             <button onclick="toggleMute()" id="mute-btn" style="background:none; border:1px solid #444; color:#aaa; font-size:10px;">ЗВУК: ВКЛ</button>
-            <div id="round-indicator" style="color:#8b5a2b">РАУНД 1/3</div>
-            <button onclick="location.reload()" style="background:#400; color:white; border:none; font-size:10px; padding:5px 10px;">ПОБЕГ</button>
+            <span id="round-txt" style="color:#8b5a2b">РАУНД 1/3</span>
+            <button onclick="location.reload()" style="background:#300; color:red; border:none; font-size:10px;">ПОБЕГ</button>
         </div>
-        
-        <div style="display:flex; flex-direction:column; align-items:center; padding:10px;">
-            <div id="opp-name" style="font-size:10px; color:#555;">ПРОТИВНИК</div>
-            <div class="hp-bar" id="opp-hp"></div>
-            <div id="opp-inv" class="inv" style="transform: scale(0.7); min-height: 20px;"></div>
+
+        <div style="display:flex; flex-direction:column; align-items:center; padding:5px;">
+            <div id="opp-hp" class="hp-bar"></div>
+            <div id="opp-inv" class="inv" style="transform: scale(0.8);"></div>
         </div>
 
         <div id="table">
             <div id="game-log">ОЖИДАНИЕ...</div>
             <img id="gun" src="Gun.png">
-            <div id="dmg-view" class="dmg-badge">УРОН x2 🔪</div>
+            <div id="dmg-x2">УРОН x2 🔪</div>
         </div>
 
         <div id="player-panel">
-            <div style="text-align:center; font-size:10px; color:#444; margin-bottom:5px;">
-                LIVE: <span id="l-cnt" style="color:red">0</span> | BLANK: <span id="b-cnt" style="color:gray">0</span>
-            </div>
-            <div class="hp-bar" style="justify-content:center;" id="my-hp"></div>
+            <div id="my-hp" class="hp-bar" style="justify-content:center;"></div>
             <div id="my-inv" class="inv"></div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <button id="btn-self" class="btn" style="width:auto; margin:0;" onclick="shoot('self')">В СЕБЯ</button>
-                <button id="btn-opp" class="btn" style="width:auto; margin:0;" onclick="shoot('opp')">В ВРАГА</button>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <button id="btn-self" class="btn" style="width:auto; margin:0;" onclick="sendShoot('self')">В СЕБЯ</button>
+                <button id="btn-opp" class="btn" style="width:auto; margin:0;" onclick="sendShoot('opp')">В ВРАГА</button>
             </div>
         </div>
     </div>
 
-    <audio id="snd-bg" src="background_music.mp3" loop></audio>
     <audio id="snd-live" src="shot_live.mp3"></audio>
     <audio id="snd-blank" src="shot_blank.mp3"></audio>
-    <audio id="snd-reload" src="reload.mp3"></audio>
     <audio id="snd-item" src="item_use.mp3"></audio>
 
 <script>
     const socket = io("https://bucshot.onrender.com");
-    let state = { roomId: null, turn: false, processing: false, myHP: 3, oppHP: 3, mag: [], myInv: [], oppInv: [], dmg: 1, round: 1, muted: false };
+    let state = { roomId: null, turn: false, processing: false, muted: false, myInv: [], oppInv: [] };
     const IMGS = { 'hpFull': 'Health_2.png', 'hpEmpty': 'Health_1.png', 'Beer': 'Beer.png', 'Knife': 'Hand saw.png', 'Cigaretes': 'cigaretes.png', 'Handclifs': 'Handclifs.png', 'Lighter': 'Lighter.png' };
 
-    function playSnd(id) { if(!state.muted) { let a = document.getElementById('snd-'+id); a.currentTime=0; a.play().catch(()=>{}); } }
-    function log(t) { document.getElementById('game-log').innerText = t; }
-    function toggleMute() { state.muted = !state.muted; document.getElementById('snd-bg').muted = state.muted; document.getElementById('mute-btn').innerText = state.muted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ"; }
+    function join() { socket.emit('join_game', { name: "Игрок" }); document.getElementById('game-log').innerText = "ПОИСК..."; }
+    function toggleMute() { state.muted = !state.muted; document.getElementById('mute-btn').innerText = state.muted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ"; }
 
-    function startMulti() { socket.emit('join_game', { name: "Игрок" }); log("ПОИСК..."); playSnd('bg'); }
-
-    socket.on('start_game', d => {
-        state = { ...state, roomId: d.id, mag: d.mag, turn: d.turn, myInv: d.myInv, oppInv: d.oppInv, myHP: 3, oppHP: 3 };
+    socket.on('init_game', d => {
+        state = { ...state, roomId: d.roomId, turn: d.turn, myInv: d.myInv, oppInv: d.oppInv };
         document.getElementById('main-menu').style.display = 'none';
         document.getElementById('game-ui').style.display = 'flex';
-        render();
+        render(3, 3);
     });
 
-    socket.on('opponent_action', d => {
-        if (d.type === 'shoot') { visualShoot(d.target === 'self' ? 'opp' : 'self', state.mag.shift(), false); }
-        else if (d.type === 'item') { applyItem(d.item, false); }
+    socket.on('action_result', d => {
+        const isMe = (d.actor === socket.id);
+        if (d.type === 'shoot') {
+            visualShoot(d.target, d.isLive, isMe, d.hp, d.nextTurn);
+        } else if (d.type === 'item') {
+            visualItem(d.effect, d.hp);
+        }
     });
 
     socket.on('next_round', d => {
-        state.round = d.round; state.mag = d.mag; state.myHP = 3; state.oppHP = 3;
-        document.getElementById('round-indicator').innerText = `РАУНД ${state.round}/3`;
-        log(`РАУНД ${state.round} НАЧАЛСЯ`);
-        render();
-    });
-
-    socket.on('reload', d => {
-        state.mag = d.mag;
-        state.myInv = [...state.myInv, ...d.newItems].slice(0, 8);
-        state.oppInv = [...state.oppInv, ...d.newItems].slice(0, 8);
-        playSnd('reload'); render();
+        setTimeout(() => {
+            document.getElementById('round-txt').innerText = `РАУНД ${d.round}/3`;
+            render(3, 3);
+            document.getElementById('game-log').innerText = `РАУНД ${d.round} НАЧАЛСЯ!`;
+        }, 2000);
     });
 
     socket.on('game_over', d => {
-        document.getElementById('game-ui').style.display = 'none';
-        const win = socket.id === d.winner;
-        document.getElementById('game-over-screen').style.display = 'flex';
-        document.getElementById('over-title').innerText = win ? "ПОБЕДА" : "ПОРАЖЕНИЕ";
-        document.getElementById('over-title').style.color = win ? "#0f0" : "#f00";
+        setTimeout(() => {
+            document.getElementById('game-ui').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'flex';
+            const win = socket.id === d.winner;
+            document.getElementById('end-title').innerText = win ? "ПОБЕДА" : "ПОРАЖЕНИЕ";
+            document.getElementById('end-title').style.color = win ? "#0f0" : "#f00";
+        }, 2000);
     });
 
-    function shoot(target) {
-        if (!state.turn || state.processing) return;
-        const bullet = state.mag.shift();
-        socket.emit('game_action', { roomId: state.roomId, type: 'shoot', target, bullet, dmg: state.dmg });
-        visualShoot(target, bullet, true);
-    }
+    function sendShoot(t) { if(!state.turn || state.processing) return; socket.emit('game_action', { roomId: state.roomId, type: 'shoot', target: t }); }
+    
+    function useItem(it) { if(!state.turn || state.processing) return; socket.emit('game_action', { roomId: state.roomId, type: 'item', item: it }); }
 
-    function visualShoot(target, isLive, isMe) {
-        state.processing = true; render();
+    function visualShoot(target, isLive, isMe, hpMap, nextTurnId) {
+        state.processing = true;
         const gun = document.getElementById('gun');
         if (isMe) gun.style.transform = target === 'self' ? 'rotate(180deg) translateY(40px)' : 'translateX(60px)';
         else gun.style.transform = target === 'self' ? 'translateX(-60px)' : 'rotate(180deg) translateY(-40px)';
 
         setTimeout(() => {
-            playSnd(isLive ? 'live' : 'blank');
-            if (isLive) {
-                document.getElementById('flash-effect').style.opacity = 1; setTimeout(()=>document.getElementById('flash-effect').style.opacity=0, 100);
-                if (target === 'self') isMe ? state.myHP -= state.dmg : state.oppHP -= state.dmg;
-                else isMe ? state.oppHP -= state.dmg : state.myHP -= state.dmg;
-            }
-            state.dmg = 1; document.getElementById('dmg-view').style.display = 'none';
+            if(!state.muted) document.getElementById(isLive ? 'snd-live' : 'snd-blank').play();
+            if(isLive) { document.getElementById('flash').style.opacity = 1; setTimeout(()=>document.getElementById('flash').style.opacity=0, 100); }
+            
             setTimeout(() => {
                 gun.style.transform = 'none';
-                let keep = (!isLive && target === 'self');
-                state.turn = isMe ? keep : !keep;
-                state.processing = false; render();
+                state.turn = (nextTurnId === socket.id);
+                state.processing = false;
+                document.getElementById('dmg-x2').style.display = 'none';
+                const oppId = Object.keys(hpMap).find(id => id !== socket.id);
+                render(hpMap[socket.id], hpMap[oppId]);
             }, 1000);
         }, 600);
     }
 
-    function useItem(it, idx) {
-        if (!state.turn || state.processing) return;
-        state.myInv.splice(idx, 1);
-        socket.emit('game_action', { roomId: state.roomId, type: 'item', item: it });
-        applyItem(it, true);
+    function visualItem(eff, hpMap) {
+        if(!state.muted) document.getElementById('snd-item').play();
+        const isMe = (eff.actor === socket.id);
+        let msg = (isMe ? "ВЫ: " : "ВРАГ: ") + eff.item;
+        if(eff.item === 'Beer') msg += ` (выброшен ${eff.discard ? "БОЕВОЙ" : "ХОЛОСТОЙ"})`;
+        if(eff.item === 'Knife') document.getElementById('dmg-x2').style.display = 'block';
+        
+        if(isMe) state.myInv.splice(state.myInv.indexOf(eff.item), 1);
+        else state.oppInv.splice(state.oppInv.indexOf(eff.item), 1);
+        
+        document.getElementById('game-log').innerText = msg;
+        const oppId = Object.keys(hpMap).find(id => id !== socket.id);
+        render(hpMap[socket.id], hpMap[oppId]);
     }
 
-    function applyItem(it, isMe) {
-        playSnd('item');
-        let user = isMe ? "ВЫ" : "ВРАГ";
-        let detail = "";
-        if (it === 'Beer') { let b = state.mag.shift(); detail = `выброшен ${b?"БОЕВОЙ":"ХОЛОСТОЙ"}`; playSnd('reload'); }
-        else if (it === 'Knife') { state.dmg = 2; detail = "УРОН x2"; document.getElementById('dmg-view').style.display = 'block'; }
-        else if (it === 'Cigaretes') { isMe ? state.myHP = Math.min(3, state.myHP+1) : state.oppHP = Math.min(3, state.oppHP+1); detail = "+1 HP"; }
-        else if (it === 'Lighter') { detail = isMe ? `патрон ${state.mag[0]?"БОЕВОЙ":"ХОЛОСТОЙ"}` : "заглянул в ствол"; }
-        log(`${user}: ${it} (${detail})`);
-        if(!isMe) { let i = state.oppInv.indexOf(it); if(i>-1) state.oppInv.splice(i,1); }
-        render();
-    }
-
-    function render() {
+    function render(myHP, oppHP) {
         const hp = (id, v) => {
             document.getElementById(id).innerHTML = Array(3).fill(0).map((_,i)=>`<div class="hp-icon" style="background-image:url(${i<v?IMGS.hpFull:IMGS.hpEmpty})"></div>`).join('');
         };
-        hp('my-hp', state.myHP); hp('opp-hp', state.oppHP);
-        const inv = (id, arr, isMe) => {
-            document.getElementById(id).innerHTML = arr.map((it,i)=>`<div class="item-btn" style="background-image:url('${IMGS[it]}')" ${isMe?`onclick="useItem('${it}',${i})"`:''}></div>`).join('');
-        };
-        inv('my-inv', state.myInv, true); inv('opp-inv', state.oppInv, false);
-        document.getElementById('l-cnt').innerText = state.mag.filter(x=>x).length;
-        document.getElementById('b-cnt').innerText = state.mag.filter(x=>!x).length;
+        hp('my-hp', myHP); hp('opp-hp', oppHP);
+        
+        document.getElementById('my-inv').innerHTML = state.myInv.map(it => `<div class="item-btn" style="background-image:url('${IMGS[it]}')" onclick="useItem('${it}')"></div>`).join('');
+        document.getElementById('opp-inv').innerHTML = state.oppInv.map(it => `<div class="item-btn" style="background-image:url('${IMGS[it]}')"></div>`).join('');
+        
         document.getElementById('btn-self').disabled = !state.turn || state.processing;
         document.getElementById('btn-opp').disabled = !state.turn || state.processing;
-        if(!state.processing) log(state.turn ? "ВАШ ХОД" : "ХОД ПРОТИВНИКА...");
+        if(!state.processing) document.getElementById('game-log').innerText = state.turn ? "ВАШ ХОД" : "ХОД ПРОТИВНИКА...";
     }
 </script>
 </body>
