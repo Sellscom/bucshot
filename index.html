@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Buckshot Roulette TG</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 500px;
+            background: url('Game_Table.jpg') center/cover no-repeat;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Здоровье */
+        .health-bar {
+            display: flex;
+            gap: 5px;
+            padding: 10px;
+            background: rgba(0,0,0,0.5);
+        }
+        .hp-icon { width: 30px; height: 40px; }
+
+        /* Игровая зона */
+        #central-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        #gun-img {
+            width: 80%;
+            image-rendering: pixelated;
+            transition: transform 0.2s;
+        }
+
+        .status-text {
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            margin: 10px;
+            border: 1px solid #555;
+            font-size: 14px;
+        }
+
+        /* Инвентарь и кнопки */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(20, 20, 20, 0.9);
+        }
+
+        .inventory {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            padding: 10px;
+            min-height: 60px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .item-btn {
+            width: 45px;
+            height: 45px;
+            border: 1px solid #fff;
+            cursor: pointer;
+            background-size: cover;
+        }
+
+        .action-btn {
+            padding: 15px;
+            border: none;
+            background: #444;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .action-btn:active { background: #666; }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="health-bar" id="dealer-hp-bar"></div>
+
+    <div id="central-area">
+        <div id="info" class="status-text">Загрузка игры...</div>
+        <img src="Gun.png" id="gun-img" alt="Gun">
+    </div>
+
+    <div>
+        <div id="inventory" class="inventory"></div>
+        <div class="health-bar" id="player-hp-bar"></div>
+        <div class="controls">
+            <button class="action-btn" onclick="shoot('self')">В СЕБЯ</button>
+            <button class="action-btn" onclick="shoot('opponent')">В ДИЛЕРА</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Конфигурация
+    const IMGS = {
+        hpFull: 'Health_2.png',
+        hpEmpty: 'Health_1.png',
+        beer: 'Beer.jpg',
+        knife: 'Hand saw.png',
+        cigs: 'cigaretes.jpg',
+        cuffs: 'Handclifs.jpg',
+        phone: 'cellphone.jpg',
+        lighter: 'Lighter.jpg'
+    };
+
+    let state = {
+        round: 1,
+        playerHP: 2,
+        dealerHP: 2,
+        maxHP: 2,
+        magazine: [], // true = LIVE, false = SAFE
+        isPlayerTurn: true,
+        isKnifeActive: false,
+        isCuffed: false,
+        inventory: []
+    };
+
+    // Инициализация раунда
+    function initRound() {
+        if (state.round === 2) state.maxHP = 3;
+        if (state.round >= 3) state.maxHP = 4;
+        
+        state.playerHP = state.maxHP;
+        state.dealerHP = state.maxHP;
+        
+        generateMagazine();
+        updateUI();
+        log(`Раунд ${state.round}. Заряжено ${state.magazine.length} патронов.`);
+    }
+
+    function generateMagazine() {
+        state.magazine = [];
+        const count = 8;
+        const liveCount = Math.floor(Math.random() * 4) + 2; // 2-5 боевых
+        for(let i=0; i<count; i++) state.magazine.push(i < liveCount);
+        state.magazine.sort(() => Math.random() - 0.5);
+    }
+
+    function updateUI() {
+        // Отрисовка HP
+        renderHP('player-hp-bar', state.playerHP);
+        renderHP('dealer-hp-bar', state.dealerHP);
+        
+        // Отрисовка инвентаря
+        const invDiv = document.getElementById('inventory');
+        invDiv.innerHTML = '';
+        state.inventory.forEach((item, index) => {
+            const btn = document.createElement('div');
+            btn.className = 'item-btn';
+            btn.style.backgroundImage = `url('${IMGS[item]}')`;
+            btn.onclick = () => useItem(item, index);
+            invDiv.appendChild(btn);
+        });
+    }
+
+    function renderHP(id, current) {
+        const container = document.getElementById(id);
+        container.innerHTML = '';
+        for(let i=0; i<state.maxHP; i++) {
+            const img = document.createElement('img');
+            img.src = i < current ? IMGS.hpFull : IMGS.hpEmpty;
+            img.className = 'hp-icon';
+            container.appendChild(img);
+        }
+    }
+
+    function log(msg) {
+        document.getElementById('info').innerText = msg;
+    }
+
+    // Механика выстрела
+    function shoot(target) {
+        if (!state.isPlayerTurn) return;
+        
+        const isLive = state.magazine.shift();
+        const damage = isLive ? (state.isKnifeActive ? 2 : 1) : 0;
+        
+        if (target === 'self') {
+            if (isLive) {
+                state.playerHP -= damage;
+                log("БОЕВОЙ! Вы ранены.");
+                endTurn();
+            } else {
+                log("Холостой. Вы сохраняете ход.");
+            }
+        } else {
+            if (isLive) {
+                state.dealerHP -= damage;
+                log(`ПОПАДАНИЕ! Дилер получил ${damage} урона.`);
+            } else {
+                log("Осечка... Ход переходит.");
+            }
+            endTurn();
+        }
+
+        state.isKnifeActive = false;
+        checkGameState();
+    }
+
+    function endTurn() {
+        if (state.isCuffed) {
+            state.isCuffed = false;
+            log("Дилер закован! Ваш ход снова.");
+            updateUI();
+            return;
+        }
+        state.isPlayerTurn = false;
+        setTimeout(dealerTurn, 1000);
+    }
+
+    function dealerTurn() {
+        if (state.magazine.length === 0) return;
+        
+        // Простая логика дилера
+        const isLive = state.magazine.shift();
+        const target = Math.random() > 0.5 ? 'player' : 'self';
+        
+        if (target === 'player') {
+            if (isLive) {
+                state.playerHP -= 1;
+                log("Дилер выстрелил в вас: БОЕВОЙ!");
+            } else {
+                log("Дилер выстрелил в вас: ХОЛОСТОЙ.");
+            }
+            state.isPlayerTurn = true;
+        } else {
+            if (isLive) {
+                state.dealerHP -= 1;
+                log("Дилер выстрелил в себя: БОЕВОЙ!");
+                state.isPlayerTurn = true;
+            } else {
+                log("Дилер выстрелил в себя: ХОЛОСТОЙ. Он ходит снова.");
+                setTimeout(dealerTurn, 1000);
+                return;
+            }
+        }
+        checkGameState();
+    }
+
+    // Предметы
+    function useItem(type, index) {
+        state.inventory.splice(index, 1);
+        
+        switch(type) {
+            case 'beer':
+                const popped = state.magazine.shift();
+                log(`Выброшен патрон: ${popped ? 'БОЕВОЙ' : 'ХОЛОСТОЙ'}`);
+                break;
+            case 'knife':
+                state.isKnifeActive = true;
+                log("Ствол отпилен: урон x2");
+                break;
+            case 'cigs':
+                state.playerHP = Math.min(state.playerHP + 1, state.maxHP);
+                log("Вы покурили: +1 HP");
+                break;
+            case 'cuffs':
+                state.isCuffed = true;
+                log("Дилер в наручниках");
+                break;
+            case 'phone':
+                const slot = Math.floor(Math.random() * state.magazine.length);
+                const info = state.magazine[slot] ? 'БОЕВОЙ' : 'ХОЛОстой';
+                log(`Голос в трубке: патрон №${slot+1} - ${info}`);
+                break;
+            case 'lighter':
+                const current = state.magazine[0] ? 'БОЕВОЙ' : 'ХОЛОСТОЙ';
+                log(`Зажигалка осветила: сейчас ${current}`);
+                break;
+        }
+        updateUI();
+    }
+
+    function checkGameState() {
+        updateUI();
+        if (state.playerHP <= 0) {
+            alert("Вы проиграли!");
+            location.reload();
+        } else if (state.dealerHP <= 0) {
+            state.round++;
+            alert("Раунд пройден!");
+            giveItems();
+            initRound();
+        } else if (state.magazine.length === 0) {
+            log("Обойма пуста. Перезарядка +1 HP");
+            state.playerHP = Math.min(state.playerHP + 1, state.maxHP);
+            state.dealerHP = Math.min(state.dealerHP + 1, state.maxHP);
+            generateMagazine();
+            giveItems();
+            updateUI();
+        }
+    }
+
+    function giveItems() {
+        const pool = ['beer', 'knife', 'cigs', 'cuffs', 'phone', 'lighter'];
+        for(let i=0; i<2; i++) {
+            state.inventory.push(pool[Math.floor(Math.random()*pool.length)]);
+        }
+    }
+
+    // Старт
+    giveItems();
+    initRound();
+
+</script>
+</body>
+</html>
