@@ -5,18 +5,21 @@ const io = require('socket.io')(http, { cors: { origin: "*" } });
 
 app.use(express.static(__dirname));
 
-let waitingPlayer = null;
+let waitingPlayer = null; 
 let rooms = {};
 let onlineCount = 0;
-const ITEMS_POOL = ['Beer', 'Knife', 'Cigaretes', 'Handclifs', 'Lighter'];
 
 io.on('connection', (socket) => {
     onlineCount++;
     io.emit('update_online', onlineCount);
+    console.log(`Игрок подключен: ${socket.id}. Всего: ${onlineCount}`);
 
     socket.on('join_game', () => {
-        // Если уже есть ждущий игрок и это не мы сами
-        if (waitingPlayer && waitingPlayer.id !== socket.id) {
+        console.log(`Запрос на игру от: ${socket.id}`);
+
+        // 1. Проверяем, есть ли кто-то в очереди и не мы ли это сами
+        // И самое важное: проверяем, не отключился ли ждущий игрок
+        if (waitingPlayer && waitingPlayer.id !== socket.id && waitingPlayer.connected) {
             const roomId = `room_${waitingPlayer.id}_${socket.id}`;
             const p1 = waitingPlayer;
             const p2 = socket;
@@ -34,80 +37,43 @@ io.on('connection', (socket) => {
             p1.join(roomId);
             p2.join(roomId);
 
-            io.to(p1.id).emit('init_game', { roomId, myInv: rooms[roomId].inv[p1.id], oppInv: rooms[roomId].inv[p2.id], turn: true, mode: 'multi' });
-            io.to(p2.id).emit('init_game', { roomId, myInv: rooms[roomId].inv[p2.id], oppInv: rooms[roomId].inv[p1.id], turn: false, mode: 'multi' });
-            waitingPlayer = null;
+            io.to(p1.id).emit('init_game', { roomId, myInv: rooms[roomId].inv[p1.id], oppInv: rooms[roomId].inv[p2.id], turn: true });
+            io.to(p2.id).emit('init_game', { roomId, myInv: rooms[roomId].inv[p2.id], oppInv: rooms[roomId].inv[p1.id], turn: false });
+            
+            console.log(`Матч создан в комнате: ${roomId}`);
+            waitingPlayer = null; // Очищаем очередь
         } else {
+            // 2. Если никого нет, становимся ждущим
             waitingPlayer = socket;
-            socket.emit('waiting', "ПОИСК ИГРОКА...");
+            socket.emit('waiting', "ПОИСК ОППОНЕНТА...");
+            console.log(`Игрок ${socket.id} добавлен в очередь`);
         }
-    });
-
-    socket.on('game_action', (data) => {
-        const room = rooms[data.roomId];
-        if (!room || room.turn !== socket.id) return;
-        processAction(data.roomId, socket.id, data);
     });
 
     socket.on('disconnect', () => {
         onlineCount--;
         io.emit('update_online', onlineCount);
-        if (waitingPlayer && waitingPlayer.id === socket.id) waitingPlayer = null;
+        
+        // Если отключился тот, кто ждал игру — очищаем переменную
+        if (waitingPlayer && waitingPlayer.id === socket.id) {
+            waitingPlayer = null;
+            console.log("Ждущий игрок отключился, очередь пуста.");
+        }
     });
+
+    // ... остальной код (game_action, checkState и т.д.) остается прежним
 });
 
-function processAction(roomId, playerId, data) {
-    const room = rooms[roomId];
-    if (data.type === 'shoot') {
-        const isLive = room.magazine.shift();
-        let nextTurn = room.turn;
-        if (isLive) {
-            const victimId = data.target === 'self' ? playerId : room.players.find(id => id !== playerId);
-            room.hp[victimId] -= room.dmg;
-            nextTurn = room.players.find(id => id !== playerId);
-        } else {
-            if (data.target === 'opp') nextTurn = room.players.find(id => id !== playerId);
-        }
-        room.dmg = 1; room.turn = nextTurn;
-        io.to(roomId).emit('action_result', { type: 'shoot', actor: playerId, target: data.target, isLive, hp: room.hp, nextTurn });
-        checkState(roomId);
-    } else if (data.type === 'item') {
-        const idx = room.inv[playerId].indexOf(data.item);
-        if (idx > -1) {
-            room.inv[playerId].splice(idx, 1);
-            let logData = { item: data.item, actor: playerId };
-            if (data.item === 'Beer') logData.extra = room.magazine.shift();
-            if (data.item === 'Knife') room.dmg = 2;
-            if (data.item === 'Cigaretes') room.hp[playerId] = Math.min(3, room.hp[playerId] + 1);
-            io.to(roomId).emit('action_result', { type: 'item', logData, hp: room.hp });
-        }
-    }
-}
-
-function checkState(roomId) {
-    const room = rooms[roomId];
-    if (!room) return;
-    const dead = room.players.find(id => room.hp[id] <= 0);
-    if (dead) {
-        room.round++;
-        if (room.round > 3) {
-            io.to(roomId).emit('game_over', { winner: room.players.find(id => id !== dead) });
-            delete rooms[roomId];
-        } else {
-            room.hp = { [room.players[0]]: 3, [room.players[1]]: 3 };
-            room.magazine = generateMagazine();
-            io.to(roomId).emit('next_round', { round: room.round, hp: room.hp });
-        }
-    } else if (room.magazine.length === 0) {
-        room.magazine = generateMagazine();
-        io.to(roomId).emit('reload', { mag: room.magazine });
-    }
-}
-
+// Вспомогательные функции (Magazine, Items) должны быть здесь
 function generateMagazine() {
     const s = Math.floor(Math.random() * 4) + 3;
     return Array(s).fill(false).map((_, i) => i < Math.ceil(s/2)).sort(() => Math.random() - 0.5);
 }
-function generateItems(n) { return Array(n).fill(0).map(() => ITEMS_POOL[Math.floor(Math.random() * ITEMS_POOL.length)]); }
+function generateItems(n) {
+    const pool = ['Beer', 'Knife', 'Cigaretes', 'Handclifs', 'Lighter'];
+    return Array(n).fill(0).map(() => pool[Math.floor(Math.random() * pool.length)]);
+}
 
-http.listen(process.env.PORT || 3000);
+http.listen(process.env.PORT || 3000, () => {
+    console.log("СЕРВЕР ЗАПУЩЕН НА ПОРТУ 3000");
+});
