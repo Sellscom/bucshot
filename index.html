@@ -3,77 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Buckshot Roulette Online</title>
+    <title>Buckshot Online</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; user-select: none; }
-        
-        #main-menu { position: absolute; inset: 0; background: #000; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 6px solid #5d3a1a; box-sizing: border-box;}
-        .btn { padding: 15px; width: 240px; margin: 10px; background: #1a1a1a; border: 2px solid #5d3a1a; color: #fff; font-weight: bold; cursor: pointer; text-transform: uppercase;}
-        
-        #game-ui { position: relative; width: 100%; height: 100%; max-width: 500px; display: none; flex-direction: column; background: #0a0a0a; border: 2px solid #332211; box-sizing: border-box;}
-        
-        /* Верхняя панель врага */
-        .top-panel { background: #111; padding: 10px; border-bottom: 2px solid #5d3a1a; display: flex; flex-direction: column; align-items: center; z-index: 60;}
-        .hp-bar { display: flex; gap: 4px; margin: 5px 0; height: 30px; }
-        .hp-icon { width: 20px; height: 30px; background-size: contain; background-repeat: no-repeat; background-position: center; }
-        .inv-mini { display: flex; gap: 3px; height: 25px; opacity: 0.6; }
-
-        /* Игровое поле */
-        #table { flex-grow: 1; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; background-image: url('Game_Table.png'); background-size: cover; background-position: center; }
-        #gun { width: 75%; transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28); z-index: 10; filter: drop-shadow(0 0 10px #000); }
-        
-        /* Лог событий */
-        #game-log { position: absolute; top: 20px; width: 90%; background: rgba(0,0,0,0.85); border: 2px solid #5d3a1a; color: #0f0; padding: 10px; font-size: 13px; text-align: center; z-index: 100; min-height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
-
-        /* Нижняя панель игрока */
+        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; }
+        .screen { position: absolute; inset: 0; background: #000; z-index: 300; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 8px solid #5d3a1a; box-sizing: border-box; }
+        #main-menu { display: flex; }
+        .btn { padding: 15px; width: 240px; margin: 10px; background: #1a1a1a; border: 2px solid #5d3a1a; color: #fff; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        #game-ui { position: relative; width: 100%; height: 100%; max-width: 500px; display: none; flex-direction: column; background: #0a0a0a; border: 2px solid #332211; }
+        .top-nav { width: 100%; display: flex; justify-content: space-between; padding: 10px; background: #111; box-sizing: border-box; }
+        #game-log { position: absolute; top: 70px; width: 90%; left: 5%; background: rgba(0,0,0,0.9); border: 2px solid #5d3a1a; color: #0f0; padding: 10px; font-size: 13px; text-align: center; z-index: 100; min-height: 40px; }
+        #table { flex-grow: 1; position: relative; display: flex; justify-content: center; align-items: center; background: url('Game_Table.png') center/cover; }
+        #gun { width: 75%; transition: transform 0.4s; z-index: 10; }
         #player-panel { background: #000; padding: 15px; border-top: 2px solid #5d3a1a; }
-        .inv-main { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 55px; margin: 10px 0; }
-        .item-btn { width: 45px; height: 45px; border: 1px solid #5d3a1a; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #111; cursor: pointer; }
-        
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .btn-shoot { padding: 18px; background: #1a1a1a; border: 1px solid #5d3a1a; color: #fff; font-weight: bold; cursor: pointer; }
-        .btn-shoot:disabled { opacity: 0.1; cursor: default; }
-
+        .inv { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 50px; margin: 10px 0; }
+        .item-btn { width: 45px; height: 45px; border: 1px solid #5d3a1a; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #111; }
+        .hp-bar { display: flex; gap: 4px; height: 25px; }
+        .hp-icon { width: 18px; height: 25px; background-size: contain; background-repeat: no-repeat; }
         .flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 100; pointer-events: none; }
-        .dmg-view { color: #f00; font-weight: bold; position: absolute; bottom: 10px; right: 10px; font-size: 18px; display: none; text-shadow: 1px 1px #000; }
+        .dmg-badge { color: red; position: absolute; bottom: 20px; right: 20px; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="main-menu">
-        <h1 style="color:#8b5a2b; letter-spacing:2px;">BUCKSHOT ONLINE</h1>
-        <div style="color:#444; margin-bottom:20px;">ОНЛАЙН: <span id="online-cnt">0</span></div>
-        <button class="btn" onclick="startSingle()">ОДИНОЧНАЯ ИГРА</button>
-        <button class="btn" style="color:#0f0; border-color:#0f0;" onclick="startMulti()">МУЛЬТИПЛЕЕР</button>
-        <p id="menu-status" style="color:#0f0; font-size:12px;"></p>
+    <div id="main-menu" class="screen">
+        <h1 style="color:#8b5a2b;">BUCKSHOT ONLINE</h1>
+        <button class="btn" onclick="startMulti()">МУЛЬТИПЛЕЕР</button>
+        <button class="btn" onclick="startSingle()">ОДИНОЧКА</button>
+    </div>
+
+    <div id="game-over-screen" class="screen">
+        <h1 id="over-title"></h1>
+        <p id="over-msg"></p>
+        <button class="btn" onclick="location.reload()">В МЕНЮ</button>
     </div>
 
     <div id="game-ui">
         <div id="flash-effect" class="flash"></div>
+        <div class="top-nav">
+            <button onclick="toggleMute()" id="mute-btn" style="background:none; border:1px solid #444; color:#aaa; font-size:10px;">ЗВУК: ВКЛ</button>
+            <div id="round-indicator" style="color:#8b5a2b">РАУНД 1/3</div>
+            <button onclick="location.reload()" style="background:#400; color:white; border:none; font-size:10px; padding:5px 10px;">ПОБЕГ</button>
+        </div>
         
-        <div class="top-panel">
-            <div id="opp-name" style="font-size:10px; color:#aaa; margin-bottom:2px;">ПРОТИВНИК</div>
+        <div style="display:flex; flex-direction:column; align-items:center; padding:10px;">
+            <div id="opp-name" style="font-size:10px; color:#555;">ПРОТИВНИК</div>
             <div class="hp-bar" id="opp-hp"></div>
-            <div class="inv-mini" id="opp-inv"></div>
+            <div id="opp-inv" class="inv" style="transform: scale(0.7); min-height: 20px;"></div>
         </div>
 
         <div id="table">
-            <div id="game-log">ЗАГРУЗКА...</div>
+            <div id="game-log">ОЖИДАНИЕ...</div>
             <img id="gun" src="Gun.png">
-            <div id="dmg-view" class="dmg-view">УРОН x2 🔪</div>
+            <div id="dmg-view" class="dmg-badge">УРОН x2 🔪</div>
         </div>
 
         <div id="player-panel">
-            <div style="text-align:center; font-size:10px; color:#555; margin-bottom:8px;">
-                БОЕВЫЕ: <span id="l-cnt" style="color:#f44">?</span> | ХОЛОСТЫЕ: <span id="b-cnt" style="color:#888">?</span>
+            <div style="text-align:center; font-size:10px; color:#444; margin-bottom:5px;">
+                LIVE: <span id="l-cnt" style="color:red">0</span> | BLANK: <span id="b-cnt" style="color:gray">0</span>
             </div>
             <div class="hp-bar" style="justify-content:center;" id="my-hp"></div>
-            <div class="inv-main" id="my-inv"></div>
-            <div class="controls">
-                <button id="btn-self" class="btn-shoot" onclick="doShoot('self')">В СЕБЯ</button>
-                <button id="btn-opp" class="btn-shoot" onclick="doShoot('opp')">В ВРАГА</button>
+            <div id="my-inv" class="inv"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <button id="btn-self" class="btn" style="width:auto; margin:0;" onclick="shoot('self')">В СЕБЯ</button>
+                <button id="btn-opp" class="btn" style="width:auto; margin:0;" onclick="shoot('opp')">В ВРАГА</button>
             </div>
         </div>
     </div>
@@ -86,130 +80,83 @@
 
 <script>
     const socket = io("https://bucshot.onrender.com");
-    let tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || "Игрок";
+    let state = { roomId: null, turn: false, processing: false, myHP: 3, oppHP: 3, mag: [], myInv: [], oppInv: [], dmg: 1, round: 1, muted: false };
+    const IMGS = { 'hpFull': 'Health_2.png', 'hpEmpty': 'Health_1.png', 'Beer': 'Beer.png', 'Knife': 'Hand saw.png', 'Cigaretes': 'cigaretes.png', 'Handclifs': 'Handclifs.png', 'Lighter': 'Lighter.png' };
 
-    const IMGS = {
-        'Beer': 'Beer.png', 
-        'Knife': 'Hand saw.png', 
-        'Cigaretes': 'cigaretes.png',
-        'Handclifs': 'Handclifs.png', 
-        'Lighter': 'Lighter.png',
-        'hpFull': 'Health_2.png', 
-        'hpEmpty': 'Health_1.png'
-    };
+    function playSnd(id) { if(!state.muted) { let a = document.getElementById('snd-'+id); a.currentTime=0; a.play().catch(()=>{}); } }
+    function log(t) { document.getElementById('game-log').innerText = t; }
+    function toggleMute() { state.muted = !state.muted; document.getElementById('snd-bg').muted = state.muted; document.getElementById('mute-btn').innerText = state.muted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ"; }
 
-    let state = {
-        mode: 'none', roomId: null, turn: false, processing: false,
-        myHP: 3, oppHP: 3, mag: [], myInv: [], oppInv: [], dmg: 1
-    };
+    function startMulti() { socket.emit('join_game', { name: "Игрок" }); log("ПОИСК..."); playSnd('bg'); }
 
-    const playSnd = (id) => { 
-        const a = document.getElementById('snd-' + id);
-        if(a) { a.currentTime = 0; a.play().catch(()=>{}); }
-    };
-
-    const log = (txt) => { document.getElementById('game-log').innerText = txt; };
-
-    socket.on('online_count', c => document.getElementById('online-cnt').innerText = c);
-
-    // --- МУЛЬТИПЛЕЕР ---
-    function startMulti() {
-        document.getElementById('menu-status').innerText = "ПОИСК СОПЕРНИКА...";
-        socket.emit('join_game', { name: tgUser });
-        document.getElementById('snd-bg').volume = 0.2;
-        playSnd('bg');
-    }
-
-    socket.on('start_multiplayer', d => {
-        state = { mode: 'multi', roomId: d.id, mag: d.magazine, myInv: d.myInv, oppInv: d.oppInv, turn: d.turn, myHP: 3, oppHP: 3, dmg: 1, processing: false };
+    socket.on('start_game', d => {
+        state = { ...state, roomId: d.id, mag: d.mag, turn: d.turn, myInv: d.myInv, oppInv: d.oppInv, myHP: 3, oppHP: 3 };
         document.getElementById('main-menu').style.display = 'none';
         document.getElementById('game-ui').style.display = 'flex';
-        document.getElementById('opp-name').innerText = d.oppName;
         render();
     });
 
     socket.on('opponent_action', d => {
-        if (d.type === 'shoot') {
-            const bullet = state.mag.shift();
-            visualShoot(d.target === 'self' ? 'opp' : 'self', bullet, false);
-        } else if (d.type === 'item') {
-            applyItem(d.item, false);
-        }
+        if (d.type === 'shoot') { visualShoot(d.target === 'self' ? 'opp' : 'self', state.mag.shift(), false); }
+        else if (d.type === 'item') { applyItem(d.item, false); }
     });
 
-    socket.on('reload_magazine', d => {
-        state.processing = true;
-        log("ПЕРЕЗАРЯДКА...");
-        setTimeout(() => {
-            playSnd('reload');
-            state.mag = d.magazine;
-            state.myInv = [...state.myInv, ...d.newItems].slice(0, 8);
-            state.oppInv = [...state.oppInv, ...d.newItems].slice(0, 8);
-            state.processing = false;
-            render();
-        }, 1500);
+    socket.on('next_round', d => {
+        state.round = d.round; state.mag = d.mag; state.myHP = 3; state.oppHP = 3;
+        document.getElementById('round-indicator').innerText = `РАУНД ${state.round}/3`;
+        log(`РАУНД ${state.round} НАЧАЛСЯ`);
+        render();
     });
 
-    // --- ЛОГИКА СТРЕЛЬБЫ ---
-    function doShoot(target) {
-        if (!state.turn || state.processing || state.mag.length === 0) return;
+    socket.on('reload', d => {
+        state.mag = d.mag;
+        state.myInv = [...state.myInv, ...d.newItems].slice(0, 8);
+        state.oppInv = [...state.oppInv, ...d.newItems].slice(0, 8);
+        playSnd('reload'); render();
+    });
+
+    socket.on('game_over', d => {
+        document.getElementById('game-ui').style.display = 'none';
+        const win = socket.id === d.winner;
+        document.getElementById('game-over-screen').style.display = 'flex';
+        document.getElementById('over-title').innerText = win ? "ПОБЕДА" : "ПОРАЖЕНИЕ";
+        document.getElementById('over-title').style.color = win ? "#0f0" : "#f00";
+    });
+
+    function shoot(target) {
+        if (!state.turn || state.processing) return;
         const bullet = state.mag.shift();
-        if (state.mode === 'multi') {
-            socket.emit('game_action', { roomId: state.roomId, type: 'shoot', target, bullet });
-        }
+        socket.emit('game_action', { roomId: state.roomId, type: 'shoot', target, bullet, dmg: state.dmg });
         visualShoot(target, bullet, true);
     }
 
     function visualShoot(target, isLive, isMe) {
-        state.processing = true;
-        render();
+        state.processing = true; render();
         const gun = document.getElementById('gun');
-
-        // Наклон ружья
         if (isMe) gun.style.transform = target === 'self' ? 'rotate(180deg) translateY(40px)' : 'translateX(60px)';
         else gun.style.transform = target === 'self' ? 'translateX(-60px)' : 'rotate(180deg) translateY(-40px)';
 
         setTimeout(() => {
             playSnd(isLive ? 'live' : 'blank');
             if (isLive) {
-                const f = document.getElementById('flash-effect'); 
-                f.style.opacity = 1; setTimeout(() => f.style.opacity = 0, 100);
-                
-                let d = state.dmg;
-                if (target === 'self') isMe ? state.myHP -= d : state.oppHP -= d;
-                else isMe ? state.oppHP -= d : state.myHP -= d;
+                document.getElementById('flash-effect').style.opacity = 1; setTimeout(()=>document.getElementById('flash-effect').style.opacity=0, 100);
+                if (target === 'self') isMe ? state.myHP -= state.dmg : state.oppHP -= state.dmg;
+                else isMe ? state.oppHP -= state.dmg : state.myHP -= state.dmg;
             }
-            
-            state.dmg = 1; // Сброс ножа
-            document.getElementById('dmg-view').style.display = 'none';
-
+            state.dmg = 1; document.getElementById('dmg-view').style.display = 'none';
             setTimeout(() => {
                 gun.style.transform = 'none';
-                
-                // Правило смены хода
-                let stayTurn = (!isLive && target === 'self');
-                if (isMe) state.turn = stayTurn;
-                else state.turn = !stayTurn;
-
-                state.processing = false;
-                
-                if (state.myHP <= 0 || state.oppHP <= 0) {
-                    alert(state.myHP > 0 ? "ПОБЕДА!" : "ПОРАЖЕНИЕ");
-                    location.reload();
-                    return;
-                }
-                render();
+                let keep = (!isLive && target === 'self');
+                state.turn = isMe ? keep : !keep;
+                state.processing = false; render();
             }, 1000);
         }, 600);
     }
 
-    // --- ПРЕДМЕТЫ ---
     function useItem(it, idx) {
         if (!state.turn || state.processing) return;
         state.myInv.splice(idx, 1);
-        if (state.mode === 'multi') {
-            socket.emit('game_action', { roomId: state.roomId, type: 'item', item: it });
-        }
+        socket.emit('game_action', { roomId: state.roomId, type: 'item', item: it });
         applyItem(it, true);
     }
 
@@ -217,93 +164,29 @@
         playSnd('item');
         let user = isMe ? "ВЫ" : "ВРАГ";
         let detail = "";
-
-        if (it === 'Beer') {
-            const b = state.mag.shift();
-            detail = `выброшен ${b ? "БОЕВОЙ 🔥" : "ХОЛОСТОЙ ❄️"}`;
-            playSnd('reload');
-        } else if (it === 'Knife') {
-            state.dmg = 2;
-            detail = "УРОН x2 (ствол отпилен) 🔪";
-            if (isMe) document.getElementById('dmg-view').style.display = 'block';
-        } else if (it === 'Cigaretes') {
-            if (isMe) state.myHP = Math.min(3, state.myHP + 1);
-            else state.oppHP = Math.min(3, state.oppHP + 1);
-            detail = "+1 здоровье 🚬";
-        } else if (it === 'Lighter') {
-            detail = isMe ? `в стволе ${state.mag[0] ? "БОЕВОЙ 🔥" : "ХОЛОСТОЙ ❄️"}` : "заглянул в ствол 💡";
-        } else if (it === 'Handclifs') {
-            detail = "наручники (ход пропущен)";
-        }
-
-        log(`${user}: ${detail}`);
-
-        if (!isMe) {
-            const idx = state.oppInv.indexOf(it);
-            if (idx > -1) state.oppInv.splice(idx, 1);
-        }
+        if (it === 'Beer') { let b = state.mag.shift(); detail = `выброшен ${b?"БОЕВОЙ":"ХОЛОСТОЙ"}`; playSnd('reload'); }
+        else if (it === 'Knife') { state.dmg = 2; detail = "УРОН x2"; document.getElementById('dmg-view').style.display = 'block'; }
+        else if (it === 'Cigaretes') { isMe ? state.myHP = Math.min(3, state.myHP+1) : state.oppHP = Math.min(3, state.oppHP+1); detail = "+1 HP"; }
+        else if (it === 'Lighter') { detail = isMe ? `патрон ${state.mag[0]?"БОЕВОЙ":"ХОЛОСТОЙ"}` : "заглянул в ствол"; }
+        log(`${user}: ${it} (${detail})`);
+        if(!isMe) { let i = state.oppInv.indexOf(it); if(i>-1) state.oppInv.splice(i,1); }
         render();
     }
 
-    // --- РЕНДЕР ---
     function render() {
-        const hp = (id, val) => {
-            const el = document.getElementById(id); el.innerHTML = '';
-            for(let i=0; i<3; i++) {
-                const img = document.createElement('div');
-                img.className = 'hp-icon';
-                img.style.backgroundImage = `url(${i < val ? IMGS.hpFull : IMGS.hpEmpty})`;
-                el.appendChild(img);
-            }
+        const hp = (id, v) => {
+            document.getElementById(id).innerHTML = Array(3).fill(0).map((_,i)=>`<div class="hp-icon" style="background-image:url(${i<v?IMGS.hpFull:IMGS.hpEmpty})"></div>`).join('');
         };
         hp('my-hp', state.myHP); hp('opp-hp', state.oppHP);
-
-        const mInv = document.getElementById('my-inv'); mInv.innerHTML = '';
-        state.myInv.forEach((it, i) => {
-            const b = document.createElement('button');
-            b.className = 'item-btn';
-            b.style.backgroundImage = `url("${IMGS[it]}")`;
-            b.disabled = !state.turn || state.processing;
-            b.onclick = () => useItem(it, i);
-            mInv.appendChild(b);
-        });
-
-        const oInv = document.getElementById('opp-inv'); oInv.innerHTML = '';
-        state.oppInv.forEach(it => {
-            const d = document.createElement('div');
-            d.className = 'item-mini';
-            d.style.backgroundImage = `url("${IMGS[it]}")`;
-            oInv.appendChild(d);
-        });
-
-        document.getElementById('l-cnt').innerText = state.mag.filter(x => x).length;
-        document.getElementById('b-cnt').innerText = state.mag.filter(x => !x).length;
-
-        const canAct = state.turn && !state.processing;
-        document.getElementById('btn-self').disabled = !canAct;
-        document.getElementById('btn-opp').disabled = !canAct;
-
-        if (!state.processing) {
-            // Если в логе нет инфы о предмете, пишем чей ход
-            if (!logContainsResult()) {
-                log(state.turn ? "ВАШ ХОД" : "ХОД ПРОТИВНИКА...");
-            }
-        }
-    }
-
-    function logContainsResult() {
-        const t = document.getElementById('game-log').innerText;
-        return t.includes('🔥') || t.includes('❄️') || t.includes('🚬') || t.includes('🔪');
-    }
-
-    function startSingle() {
-        state.mode = 'single'; state.turn = true;
-        state.mag = [true, false, true, false].sort(() => Math.random() - 0.5);
-        state.myInv = ['Beer', 'Knife']; state.oppInv = ['Cigaretes'];
-        state.myHP = 3; state.oppHP = 3; state.dmg = 1;
-        document.getElementById('main-menu').style.display = 'none';
-        document.getElementById('game-ui').style.display = 'flex';
-        render();
+        const inv = (id, arr, isMe) => {
+            document.getElementById(id).innerHTML = arr.map((it,i)=>`<div class="item-btn" style="background-image:url('${IMGS[it]}')" ${isMe?`onclick="useItem('${it}',${i})"`:''}></div>`).join('');
+        };
+        inv('my-inv', state.myInv, true); inv('opp-inv', state.oppInv, false);
+        document.getElementById('l-cnt').innerText = state.mag.filter(x=>x).length;
+        document.getElementById('b-cnt').innerText = state.mag.filter(x=>!x).length;
+        document.getElementById('btn-self').disabled = !state.turn || state.processing;
+        document.getElementById('btn-opp').disabled = !state.turn || state.processing;
+        if(!state.processing) log(state.turn ? "ВАШ ХОД" : "ХОД ПРОТИВНИКА...");
     }
 </script>
 </body>
