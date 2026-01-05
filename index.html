@@ -3,142 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Buckshot Roulette Online</title>
+    <title>Buckshot Roulette</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; }
         .screen { position: absolute; inset: 0; background: #000; z-index: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 8px solid #5d3a1a; box-sizing: border-box; }
-        .btn { padding: 15px; width: 220px; margin: 10px; background: #1a1a1a; border: 2px solid #5d3a1a; color: #fff; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn { padding: 15px; width: 240px; margin: 10px; background: #1a1a1a; border: 2px solid #5d3a1a; color: #fff; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .btn:disabled { opacity: 0.3; }
         #game-ui { position: relative; width: 100%; height: 100%; max-width: 500px; display: none; flex-direction: column; }
-        .nav { width: 100%; display: flex; justify-content: space-between; padding: 10px; background: #111; border-bottom: 2px solid #5d3a1a; box-sizing: border-box; }
-        #table { flex-grow: 1; position: relative; display: flex; justify-content: center; align-items: center; background: #1a1a1a; overflow: hidden; }
-        #gun { width: 70%; transition: transform 0.4s; z-index: 10; }
-        #game-log { position: absolute; top: 20px; width: 80%; background: rgba(0,0,0,0.9); border: 1px solid #5d3a1a; color: #0f0; padding: 10px; text-align: center; font-size: 14px; z-index: 100; }
+        .nav { width: 100%; display: flex; justify-content: space-between; padding: 10px; background: #111; border-bottom: 2px solid #5d3a1a; box-sizing: border-box; align-items: center; }
+        #table { flex-grow: 1; position: relative; display: flex; justify-content: center; align-items: center; background: #151515; }
+        #game-log { position: absolute; top: 15px; width: 85%; background: rgba(0,0,0,0.9); border: 1px solid #5d3a1a; color: #0f0; padding: 10px; text-align: center; font-size: 13px; z-index: 100; }
         #player-panel { background: #000; padding: 15px; border-top: 2px solid #5d3a1a; }
-        .hp-bar { display: flex; gap: 5px; height: 25px; margin: 5px 0; }
-        .hp-icon { width: 20px; height: 25px; background: #444; border-radius: 2px; }
+        .hp-bar { display: flex; gap: 5px; height: 20px; margin: 5px 0; }
+        .hp-icon { width: 15px; height: 20px; background: #333; }
         .hp-live { background: #f00; box-shadow: 0 0 5px #f00; }
-        .inv { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; min-height: 45px; margin: 10px 0; }
-        .item-btn { width: 45px; height: 45px; border: 1px solid #5d3a1a; background: #222; color: #fff; font-size: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; text-align: center; }
-        .flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 200; pointer-events: none; }
+        .inv { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; min-height: 45px; margin: 10px 0; }
+        .item-btn { width: 42px; height: 42px; border: 1px solid #5d3a1a; background: #222; color: #fff; font-size: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
     </style>
 </head>
 <body>
+
     <div id="menu" class="screen">
         <h1 style="color:#8b5a2b">BUCKSHOT ONLINE</h1>
-        <button class="btn" onclick="join()">НАЙТИ ИГРУ</button>
+        <div id="online-txt" style="color:#555; margin-bottom: 20px;">В СЕТИ: 0</div>
+        <button class="btn" onclick="joinMulti()">МУЛЬТИПЛЕЕР</button>
+        <button class="btn" onclick="startSingle()">ОДИНОЧНЫЙ РЕЖИМ</button>
     </div>
 
     <div id="game-ui">
-        <div id="flash" class="flash"></div>
         <div class="nav">
-            <span id="round-txt">РАУНД 1/3</span>
-            <button onclick="location.reload()" style="background:none; border:none; color:red;">ПОБЕГ</button>
+            <button onclick="toggleMute()" id="mute-btn" style="background:none; border:1px solid #444; color:#aaa; font-size:10px; padding:5px;">ЗВУК: ВКЛ</button>
+            <span id="round-txt" style="font-size: 14px;">РАУНД 1/3</span>
+            <button onclick="location.reload()" style="background:none; border:none; color:red; font-size:12px;">ПОБЕГ</button>
         </div>
         <div style="display:flex; flex-direction:column; align-items:center; padding:10px;">
             <div id="opp-hp" class="hp-bar"></div>
-            <div id="opp-inv" class="inv"></div>
+            <div id="opp-inv" class="inv" style="opacity: 0.5;"></div>
         </div>
         <div id="table">
             <div id="game-log">ОЖИДАНИЕ...</div>
-            <div id="gun" style="font-size: 50px;">🔫</div>
+            <div id="gun" style="font-size: 60px; transition: 0.4s;">🔫</div>
         </div>
         <div id="player-panel">
             <div id="my-hp" class="hp-bar" style="justify-content:center;"></div>
             <div id="my-inv" class="inv"></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                <button id="btn-self" class="btn" style="width:auto; margin:0;" onclick="sendAction('shoot','self')">В СЕБЯ</button>
-                <button id="btn-opp" class="btn" style="width:auto; margin:0;" onclick="sendAction('shoot','opp')">В ВРАГА</button>
+                <button id="btn-self" class="btn" style="width:auto; margin:0;" onclick="sendAct('shoot','self')">В СЕБЯ</button>
+                <button id="btn-opp" class="btn" style="width:auto; margin:0;" onclick="sendAct('shoot','opp')">В ВРАГА</button>
             </div>
         </div>
     </div>
 
+    <audio id="snd-live" src="shot_live.mp3"></audio>
+    <audio id="snd-blank" src="shot_blank.mp3"></audio>
+
 <script>
-    // ЗАМЕНИТЕ ЭТОТ АДРЕС НА ВАШ URL ЕСЛИ ИСПОЛЬЗУЕТЕ RENDER
-    const socket = io(); 
-    let state = { roomId: null, turn: false, processing: false, myInv: [], oppInv: [] };
+    const socket = io(); // Замените на URL вашего сервера если нужно
+    let state = { roomId: null, turn: false, processing: false, muted: false, mode: 'multi', mag: [], myInv: [], oppInv: [], myHP: 3, oppHP: 3 };
 
-    function join() { socket.emit('join_game'); document.getElementById('game-log').innerText = "ПОИСК..."; }
+    // --- ОНЛАЙН И ПОИСК ---
+    socket.on('update_online', n => { document.getElementById('online-txt').innerText = `В СЕТИ: ${n}`; });
+    socket.on('waiting', msg => { document.getElementById('game-log').innerText = msg; });
 
-    socket.on('init_game', d => {
-        state = { ...state, roomId: d.roomId, turn: d.turn, myInv: d.myInv, oppInv: d.oppInv };
+    function joinMulti() {
+        state.mode = 'multi';
+        socket.emit('join_game');
         document.getElementById('menu').style.display = 'none';
         document.getElementById('game-ui').style.display = 'flex';
+    }
+
+    function startSingle() {
+        state.mode = 'single';
+        state.turn = true;
+        state.mag = [true, false, true, false].sort(() => Math.random() - 0.5);
+        state.myInv = ['Beer', 'Cigaretes'];
+        state.myHP = 3; state.oppHP = 3;
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('game-ui').style.display = 'flex';
+        render(3, 3);
+    }
+
+    // --- ЛОГИКА И ЗВУК ---
+    function toggleMute() {
+        state.muted = !state.muted;
+        document.getElementById('mute-btn').innerText = state.muted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ";
+    }
+
+    socket.on('init_game', d => {
+        state.roomId = d.roomId; state.turn = d.turn; state.myInv = d.myInv; state.oppInv = d.oppInv;
         render(3, 3);
     });
 
     socket.on('action_result', d => {
-        state.processing = true;
         const isMe = (d.actor === socket.id);
-        const gun = document.getElementById('gun');
-
-        if (d.type === 'shoot') {
-            if (isMe) gun.style.transform = d.target === 'self' ? 'rotate(180deg) translateY(40px)' : 'translateX(60px)';
-            else gun.style.transform = d.target === 'self' ? 'translateX(-60px)' : 'rotate(180deg) translateY(-40px)';
-
-            setTimeout(() => {
-                if (d.isLive) {
-                    document.getElementById('flash').style.opacity = 1;
-                    setTimeout(() => document.getElementById('flash').style.opacity = 0, 100);
-                }
-                setTimeout(() => {
-                    gun.style.transform = 'none';
-                    state.turn = (d.nextTurn === socket.id);
-                    state.processing = false;
-                    updateUI(d.hp);
-                }, 1000);
-            }, 600);
-        } else if (d.type === 'item') {
-            let msg = (isMe ? "ВЫ: " : "ВРАГ: ") + d.logData.item;
-            if (d.logData.item === 'Beer') msg += ` (${d.logData.extra ? "БОЕВОЙ" : "ХОЛОСТОЙ"})`;
-            document.getElementById('game-log').innerText = msg;
-            
-            const inv = isMe ? state.myInv : state.oppInv;
-            inv.splice(inv.indexOf(d.logData.item), 1);
-            state.processing = false;
-            updateUI(d.hp);
+        if (d.type === 'shoot') visualShoot(d.target, d.isLive, isMe, d.hp, d.nextTurn);
+        if (d.type === 'item') {
+            document.getElementById('game-log').innerText = `${isMe ? 'ВЫ' : 'ВРАГ'} использовали ${d.logData.item}`;
+            render(d.hp[socket.id], d.hp[Object.keys(d.hp).find(id => id !== socket.id)]);
         }
     });
 
-    socket.on('next_round', d => {
-        setTimeout(() => {
-            document.getElementById('round-txt').innerText = `РАУНД ${d.round}/3`;
-            render(d.hp[socket.id], 3); // упрощенно
-            document.getElementById('game-log').innerText = "НОВЫЙ РАУНД";
-        }, 1500);
-    });
-
-    socket.on('game_over', d => {
-        alert(socket.id === d.winner ? "ПОБЕДА!" : "ПОРАЖЕНИЕ");
-        location.reload();
-    });
-
-    function sendAction(type, target) {
+    function sendAct(type, target) {
         if (!state.turn || state.processing) return;
-        socket.emit('game_action', { roomId: state.roomId, type, target, item: target });
+        if (state.mode === 'multi') {
+            socket.emit('game_action', { roomId: state.roomId, type, target });
+        } else {
+            // Упрощенная логика для синглплеера
+            state.processing = true;
+            const isLive = state.mag.shift();
+            if (isLive) {
+                if (target === 'self') state.myHP--; else state.oppHP--;
+                state.turn = false;
+            } else {
+                if (target === 'opp') state.turn = false;
+            }
+            visualShoot(target, isLive, true, {me: state.myHP, opp: state.oppHP}, state.turn);
+            if (!state.turn) setTimeout(botMove, 2000);
+        }
     }
 
-    function updateUI(hpMap) {
-        const oppId = Object.keys(hpMap).find(id => id !== socket.id);
-        render(hpMap[socket.id], hpMap[oppId]);
+    function botMove() {
+        const target = Math.random() > 0.5 ? 'self' : 'opp';
+        const isLive = state.mag.shift();
+        if (isLive) {
+            if (target === 'self') state.oppHP--; else state.myHP--;
+            state.turn = true;
+        } else {
+            if (target === 'opp') state.turn = true;
+        }
+        visualShoot(target, isLive, false, {me: state.myHP, opp: state.oppHP}, state.turn);
     }
 
-    function render(mHP, oHP) {
-        const drawHP = (id, v) => {
-            document.getElementById(id).innerHTML = Array(3).fill(0).map((_,i) => 
-                `<div class="hp-icon ${i<v?'hp-live':''}"></div>`).join('');
+    function visualShoot(target, isLive, isMe, hps, nextTurn) {
+        state.processing = true;
+        const gun = document.getElementById('gun');
+        if (isMe) gun.style.transform = target === 'self' ? 'rotate(180deg) translateY(40px)' : 'translateX(60px)';
+        else gun.style.transform = target === 'self' ? 'translateX(-60px)' : 'rotate(180deg) translateY(-40px)';
+
+        setTimeout(() => {
+            if(!state.muted) document.getElementById(isLive ? 'snd-live' : 'snd-blank').play().catch(()=>{});
+            setTimeout(() => {
+                gun.style.transform = 'none';
+                state.processing = false;
+                state.turn = nextTurn;
+                if(state.mode === 'multi') {
+                    const oppId = Object.keys(hps).find(id => id !== socket.id);
+                    render(hps[socket.id], hps[oppId]);
+                } else {
+                    render(state.myHP, state.oppHP);
+                }
+            }, 1000);
+        }, 600);
+    }
+
+    function render(m, o) {
+        const hp = (id, v) => {
+            document.getElementById(id).innerHTML = Array(3).fill(0).map((_,i) => `<div class="hp-icon ${i<v?'hp-live':''}"></div>`).join('');
         };
-        drawHP('my-hp', mHP); drawHP('opp-hp', oHP);
-        
-        document.getElementById('my-inv').innerHTML = state.myInv.map(it => 
-            `<div class="item-btn" onclick="sendAction('item','${it}')">${it}</div>`).join('');
-        document.getElementById('opp-inv').innerHTML = state.oppInv.map(it => 
-            `<div class="item-btn">${it}</div>`).join('');
-
+        hp('my-hp', m); hp('opp-hp', o);
         document.getElementById('btn-self').disabled = !state.turn || state.processing;
         document.getElementById('btn-opp').disabled = !state.turn || state.processing;
-        if (!state.processing) document.getElementById('game-log').innerText = state.turn ? "ВАШ ХОД" : "ОЖИДАНИЕ...";
+        document.getElementById('game-log').innerText = state.turn ? "ВАШ ХОД" : "ХОД ПРОТИВНИКА...";
     }
 </script>
 </body>
