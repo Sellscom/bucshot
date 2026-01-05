@@ -3,20 +3,16 @@ const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http, { cors: { origin: "*" } });
 const TelegramBot = require('node-telegram-bot-api');
-const path = require('path');
 
-const TOKEN = '8547285463:AAGlqe57F28QQxQ3zhoViNqXMTVie1JEth8'; // Твой токен
+const TOKEN = '8547285463:AAGlqe57F28QQxQ3zhoViNqXMTVie1JEth8';
+const GAME_URL = 'https://bucshot.onrender.com';
 const bot = new TelegramBot(TOKEN, { polling: true });
-const GAME_URL = 'https://bucshot.onrender.com'; // Твой URL на Render
 
-// Важно: эта строка разрешает серверу отдавать твои картинки и звуки
 app.use(express.static(__dirname));
 
 bot.onText(/\/start/, (msg) => {
-    bot.sendMessage(msg.chat.id, "💀 Buckshot Roulette Online 💀\nГотов испытать удачу с реальным соперником?", {
-        reply_markup: {
-            inline_keyboard: [[{ text: "ИГРАТЬ ОНЛАЙН", url: GAME_URL }]]
-        }
+    bot.sendMessage(msg.chat.id, "💀 Buckshot Online 💀", {
+        reply_markup: { inline_keyboard: [[{ text: "ИГРАТЬ", url: GAME_URL }]] }
     });
 });
 
@@ -25,71 +21,85 @@ let rooms = {};
 const ITEMS_POOL = ['Beer', 'Knife', 'Cigaretes', 'Handclifs', 'Lighter'];
 
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    // Отправляем текущий онлайн всем
+    io.emit('online_count', io.engine.clientsCount);
 
-    socket.on('join_game', () => {
-        if (waitingPlayer && waitingPlayer.id !== socket.id) {
+    socket.on('disconnect', () => {
+        if (waitingPlayer && waitingPlayer.socket === socket) waitingPlayer = null;
+        io.emit('online_count', io.engine.clientsCount);
+    });
+
+    socket.on('join_game', (userData) => {
+        const playerName = userData?.name || "Игрок";
+
+        if (waitingPlayer && waitingPlayer.socket.id !== socket.id) {
             // Нашли пару
-            const roomId = `room_${waitingPlayer.id}_${socket.id}`;
-            const initialMag = generateMagazine();
+            const roomId = `room_${waitingPlayer.socket.id}_${socket.id}`;
+            const mag = generateMagazine();
             
+            const p1 = waitingPlayer;
+            const p2 = { socket, name: playerName };
+
             rooms[roomId] = {
-                players: [waitingPlayer.id, socket.id],
-                magazine: initialMag,
-                turn: waitingPlayer.id
+                players: [p1.socket.id, p2.socket.id],
+                magazine: mag,
+                turn: p1.socket.id
             };
 
-            socket.join(roomId);
-            waitingPlayer.join(roomId);
+            p1.socket.join(roomId);
+            p2.socket.join(roomId);
 
-            // Отправляем старт обоим игрокам с начальными предметами
-            io.to(waitingPlayer.id).emit('start_multiplayer', {
-                id: roomId, magazine: initialMag, turn: waitingPlayer.id, myInv: generateItems(3), oppInv: generateItems(3)
-            });
-            io.to(socket.id).emit('start_multiplayer', {
-                id: roomId, magazine: initialMag, turn: waitingPlayer.id, myInv: generateItems(3), oppInv: generateItems(3)
+            // Отправляем старт
+            io.to(p1.socket.id).emit('start_multiplayer', {
+                id: roomId, magazine: mag, turn: p1.socket.id, 
+                myInv: generateItems(3), oppInv: generateItems(3),
+                oppName: p2.name, myName: p1.name
             });
             
+            io.to(p2.socket.id).emit('start_multiplayer', {
+                id: roomId, magazine: mag, turn: p1.socket.id, 
+                myInv: generateItems(3), oppInv: generateItems(3),
+                oppName: p1.name, myName: p2.name
+            });
+
             waitingPlayer = null;
         } else {
-            // Ждем соперника
-            waitingPlayer = socket;
+            waitingPlayer = { socket, name: playerName };
             socket.emit('waiting', 'ПОИСК СОПЕРНИКА...');
         }
     });
 
-    socket.on('make_move', (data) => {
+    socket.on('game_action', (data) => {
+        // data: { roomId, type: 'shoot'|'item', target, item, bullet? }
         const room = rooms[data.roomId];
         if (!room) return;
 
-        // Убираем патрон из серверного магазина
-        room.magazine.shift();
-        
-        // Пересылаем ход другому игроку
-        socket.to(data.roomId).emit('opponent_move', data);
-
-        // Проверка на пустой магазин
-        if (room.magazine.length === 0) {
-            const newMag = generateMagazine();
-            room.magazine = newMag;
-            // Через 2 секунды (после анимаций выстрела) отправляем команду на перезарядку
-            setTimeout(() => {
-                io.to(data.roomId).emit('reload_magazine', {
-                    magazine: newMag,
-                    newItems: generateItems(2) // Выдаем по 2 новых предмета
-                });
-            }, 2000);
+        if (data.type === 'shoot') {
+            room.magazine.shift();
+            socket.to(data.roomId).emit('opponent_action', data);
+            
+            // Если патроны кончились - перезарядка
+            if (room.magazine.length === 0) {
+                setTimeout(() => {
+                    const newMag = generateMagazine();
+                    room.magazine = newMag;
+                    io.to(data.roomId).emit('reload_magazine', {
+                        magazine: newMag,
+                        newItems: generateItems(2)
+                    });
+                }, 2500);
+            }
+        } 
+        else if (data.type === 'item') {
+            // Если пиво - удаляем патрон на сервере
+            if (data.item === 'Beer') room.magazine.shift();
+            socket.to(data.roomId).emit('opponent_action', data);
         }
-    });
-
-    socket.on('disconnect', () => {
-        if (waitingPlayer === socket) waitingPlayer = null;
-        // Здесь можно добавить логику оповещения второго игрока о выходе соперника
     });
 });
 
 function generateMagazine() {
-    let total = Math.floor(Math.random() * 4) + 4; // от 4 до 7 патронов
+    let total = Math.floor(Math.random() * 4) + 4;
     let live = Math.ceil(total / 2);
     return Array(total).fill(false).map((_, i) => i < live).sort(() => Math.random() - 0.5);
 }
@@ -98,6 +108,4 @@ function generateItems(n) {
     return Array(n).fill(null).map(() => ITEMS_POOL[Math.floor(Math.random() * ITEMS_POOL.length)]);
 }
 
-http.listen(process.env.PORT || 3000, () => {
-    console.log('listening on *:' + (process.env.PORT || 3000));
-});
+http.listen(process.env.PORT || 3000);
