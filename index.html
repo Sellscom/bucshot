@@ -7,197 +7,134 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body { margin: 0; background: #050505; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; }
-        .top-btn { position: absolute; z-index: 1000; background: rgba(0,0,0,0.6); border: 1px solid #5d3a1a; color: #fff; padding: 8px 12px; cursor: pointer; text-transform: uppercase; font-size: 12px; }
-        #mute-btn { top: 10px; right: 10px; }
-        
-        #main-menu { position: absolute; width: 100%; height: 100%; background: #000; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 10px solid #5d3a1a; box-sizing: border-box; }
-        #game-outer-border { position: relative; width: 100vw; height: 100vh; max-width: 500px; border: 10px solid #5d3a1a; background: #000; display: none; flex-direction: column; }
-        
-        .health-bar { display: flex; gap: 5px; padding: 10px; background: rgba(0,0,0,0.8); justify-content: center; min-height: 30px; }
-        .hp-icon { width: 18px; height: 28px; background-size: contain; background-repeat: no-repeat; border: 1px solid #333; }
-        
-        #central-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
-        .status-text { background: rgba(0,0,0,0.9); padding: 10px; border: 1px solid #5d3a1a; color: #0f0; width: 80%; text-align: center; min-height: 50px; font-size: 14px; z-index: 10; }
-        
-        #gun-img { width: 70%; transition: transform 0.2s; z-index: 5; }
-        .inventory-box { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; padding: 10px; background: #111; min-height: 50px; border-top: 1px solid #5d3a1a; }
-        .item-btn { width: 45px; height: 45px; border: 1px solid #5d3a1a; background-color: #222; background-size: cover; cursor: pointer; }
-        
-        #ammo-info { background: #000; padding: 8px; text-align: center; font-size: 12px; border-top: 1px solid #5d3a1a; color: #ccc; }
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; }
-        .action-btn { padding: 16px; border: 1px solid #5d3a1a; background: #1a1a1a; color: #fff; cursor: pointer; font-weight: bold; }
-        .action-btn:disabled { opacity: 0.2; }
+        #main-menu { position: absolute; width: 100%; height: 100%; background: #000; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 10px solid #5d3a1a; }
+        #game-ui { position: relative; width: 100vw; height: 100vh; max-width: 500px; border: 8px solid #5d3a1a; display: none; flex-direction: column; }
+        .hp-bar { display: flex; gap: 5px; padding: 10px; background: #000; justify-content: center; border-bottom: 2px solid #5d3a1a; }
+        .hp-unit { width: 20px; height: 30px; border: 1px solid #fff; background: #f00; }
+        .hp-unit.empty { background: #222; }
+        #table { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        #gun { width: 70%; transition: transform 0.3s; z-index: 5; }
+        .status { background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #0f0; color: #0f0; margin: 10px; text-align: center; width: 80%; font-size: 14px; }
+        .inv { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px; background: #111; justify-content: center; border-top: 2px solid #5d3a1a; min-height: 50px; }
+        .item { width: 45px; height: 45px; background: #222; border: 1px solid #5d3a1a; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+        .btn { padding: 15px; background: #1a1a1a; border: 2px solid #5d3a1a; color: #fff; font-weight: bold; cursor: pointer; }
+        .btn:disabled { opacity: 0.2; }
     </style>
 </head>
 <body>
 
-    <audio id="snd-bg" src="background_music.mp3" loop></audio>
-    <audio id="snd-live" src="shot_live.mp3"></audio>
-    <audio id="snd-blank" src="shot_blank.mp3"></audio>
-
-    <button id="mute-btn" class="top-btn" onclick="toggleMute()">ЗВУК: ВКЛ</button>
+    <audio id="m_bg" src="https://thelongdark.su/files/music/bg.mp3" loop></audio>
+    <audio id="s_live" src="https://www.myinstants.com/media/sounds/heavy-shotgun-shot.mp3"></audio>
+    <audio id="s_blank" src="https://www.myinstants.com/media/sounds/empty-gun-shot.mp3"></audio>
 
     <div id="main-menu">
-        <h1 style="color: #8b5a2b;">BUCKSHOT ONLINE</h1>
-        <button class="action-btn" style="width: 260px;" onclick="startMulti()">НАЙТИ ОППОНЕНТА</button>
-        <p id="search-status" style="color: #0f0; font-size: 12px; margin-top: 10px;"></p>
+        <h1 style="color:#8b5a2b">BUCKSHOT ONLINE</h1>
+        <button class="btn" style="width:200px" onclick="initMulti()">ИГРАТЬ</button>
+        <p id="st">ОЖИДАНИЕ...</p>
     </div>
 
-    <div id="game-outer-border">
-        <div class="health-bar" id="opp-hp"></div>
-        <div id="central-area">
-            <div id="info" class="status-text">ПОДГОТОВКА...</div>
-            <img src="https://i.imgur.com/8mX3BfT.png" id="gun-img">
+    <div id="game-ui">
+        <div class="hp-bar" id="opp-hp"></div>
+        <div id="table">
+            <div id="info" class="status">ПОДГОТОВКА...</div>
+            <img id="gun" src="https://i.imgur.com/8mX3BfT.png">
         </div>
-        <div id="ammo-info">БОЕВЫЕ: <span id="c-live" style="color:red">0</span> | ХОЛОСТЫЕ: <span id="c-blank" style="color:gray">0</span></div>
-        <div class="health-bar" id="my-hp"></div>
-        <div class="inventory-box" id="my-inventory"></div>
+        <div style="text-align:center; font-size:12px; padding:5px;">БОЕВЫЕ: <span id="l-c" style="color:red">0</span> | ХОЛОСТЫЕ: <span id="b-c" style="color:gray">0</span></div>
+        <div class="hp-bar" id="my-hp"></div>
+        <div class="inv" id="my-inv"></div>
         <div class="controls">
-            <button id="btn-self" class="action-btn" onclick="shoot('self')">В СЕБЯ</button>
-            <button id="btn-opp" class="action-btn" onclick="shoot('opponent')">В ВРАГА</button>
+            <button id="b-self" class="btn" onclick="fire('self')">В СЕБЯ</button>
+            <button id="b-opp" class="btn" onclick="fire('opponent')">В ВРАГА</button>
         </div>
     </div>
 
 <script>
     const socket = io("https://bucshot.onrender.com");
-    let multiplayerId = null;
-    let isMuted = false;
+    let room = null;
+    let state = { myHP: 3, oppHP: 3, mag: [], turn: false, inv: [] };
 
-    const IMGS = {
-        'hpFull': 'https://i.imgur.com/vH9I5D9.png', 
-        'hpEmpty': 'https://i.imgur.com/T0b4Dsh.png',
-        'Beer': 'https://i.imgur.com/W2O7rVq.png',
-        'Knife': 'https://i.imgur.com/86m2YwG.png', // Заглушки
-        'Cigaretes': 'https://i.imgur.com/Uf7V1O1.png'
-    };
-
-    let state = {
-        myHP: 3, oppHP: 3,
-        magazine: [], isMyTurn: false,
-        myInv: []
-    };
-
-    function toggleMute() {
-        isMuted = !isMuted;
-        document.getElementById('snd-bg').muted = isMuted;
-        document.getElementById('mute-btn').innerText = isMuted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ";
-    }
-
-    function startMulti() {
-        document.getElementById('search-status').innerText = "ПОИСК...";
+    function initMulti() {
+        document.getElementById('st').innerText = "ПОИСК...";
         socket.emit('join_game');
     }
 
     socket.on('start_multiplayer', (data) => {
-        multiplayerId = data.id;
-        state.magazine = data.magazine;
-        state.isMyTurn = (data.turn === socket.id);
-        state.myInv = data.myInv;
+        room = data.id;
+        state.mag = data.magazine;
+        state.turn = (data.turn === socket.id);
+        state.inv = data.myInv;
         
         document.getElementById('main-menu').style.display = 'none';
-        document.getElementById('game-outer-border').style.display = 'flex';
-        
-        const bg = document.getElementById('snd-bg');
-        bg.volume = 0.3;
-        bg.play().catch(() => console.log("Нужен клик для музыки"));
-        
+        document.getElementById('game-ui').style.display = 'flex';
+        document.getElementById('m_bg').play().catch(() => {});
         updateUI();
     });
 
     socket.on('opponent_move', (data) => {
-        if(data.type === 'shoot') {
-            const bullet = state.magazine.shift();
-            executeVisualShot(data.target === 'self' ? 'opponent' : 'self', bullet, false);
-        }
+        const bullet = state.mag.shift();
+        animShot(data.target === 'self' ? 'opponent' : 'self', bullet, false);
+    });
+
+    socket.on('reload_magazine', (data) => {
+        state.mag = data.magazine;
+        state.inv = [...state.inv, ...data.newItems].slice(0, 8);
+        document.getElementById('info').innerText = "МАГАЗИН ПЕРЕЗАРЯЖЕН!";
+        updateUI();
     });
 
     function updateUI() {
-        const drawHP = (id, count) => {
+        const hp = (id, n) => {
             const el = document.getElementById(id); el.innerHTML = '';
-            for(let i=0; i<3; i++) {
-                const div = document.createElement('div');
-                div.className = 'hp-icon';
-                div.style.backgroundImage = `url(${i < count ? IMGS.hpFull : IMGS.hpEmpty})`;
-                el.appendChild(div);
-            }
+            for(let i=0; i<3; i++) el.innerHTML += `<div class="hp-unit ${i>=n?'empty':''}"></div>`;
         };
-        drawHP('my-hp', state.myHP);
-        drawHP('opp-hp', state.oppHP);
+        hp('my-hp', state.myHP);
+        hp('opp-hp', state.oppHP);
 
-        const invBox = document.getElementById('my-inventory');
-        invBox.innerHTML = '';
-        state.myInv.forEach((item, idx) => {
-            const btn = document.createElement('div');
-            btn.className = 'item-btn';
-            btn.style.backgroundImage = `url(${IMGS[item] || ''})`;
-            btn.onclick = () => useItem(idx);
-            invBox.appendChild(btn);
+        const invEl = document.getElementById('my-inv'); invEl.innerHTML = '';
+        state.inv.forEach((it) => {
+            const d = document.createElement('div'); d.className = 'item';
+            d.innerText = it; d.onclick = () => alert("Предмет: " + it);
+            invEl.appendChild(d);
         });
 
-        document.getElementById('c-live').innerText = state.magazine.filter(b => b).length;
-        document.getElementById('c-blank').innerText = state.magazine.filter(b => !b).length;
-        document.getElementById('info').innerText = state.isMyTurn ? "ВАШ ХОД" : "ОЖИДАНИЕ ХОДА ВРАГА...";
-        
-        document.getElementById('btn-self').disabled = !state.isMyTurn;
-        document.getElementById('btn-opp').disabled = !state.isMyTurn;
+        document.getElementById('l-c').innerText = state.mag.filter(b => b).length;
+        document.getElementById('b-c').innerText = state.mag.filter(b => !b).length;
+        document.getElementById('info').innerText = state.turn ? "ВАШ ХОД" : "ХОД ВРАГА";
+        document.getElementById('b-self').disabled = !state.turn;
+        document.getElementById('b-opp').disabled = !state.turn;
     }
 
-    function shoot(target) {
-        if (!state.isMyTurn) return;
-        const bullet = state.magazine.shift();
-        socket.emit('make_move', { roomId: multiplayerId, type: 'shoot', target, bullet });
-        executeVisualShot(target, bullet, true);
+    function fire(target) {
+        if (!state.turn) return;
+        const bullet = state.mag.shift();
+        socket.emit('make_move', { roomId: room, target, bullet, type: 'shoot' });
+        animShot(target, bullet, true);
     }
 
-    function executeVisualShot(target, isLive, isMe) {
-        state.isMyTurn = false; // Блокируем кнопки
+    function animShot(target, live, isMe) {
+        state.turn = false;
         updateUI();
-
-        const gun = document.getElementById('gun-img');
-        if (isMe) gun.style.transform = target === 'self' ? 'rotate(180deg) translateY(30px)' : 'translateX(40px)';
-        else gun.style.transform = target === 'self' ? 'translateX(-40px)' : 'rotate(180deg) translateY(-30px)';
+        const g = document.getElementById('gun');
+        if (isMe) g.style.transform = target === 'self' ? 'rotate(180deg) translateY(20px)' : 'translateX(30px)';
+        else g.style.transform = target === 'self' ? 'translateX(-30px)' : 'rotate(180deg) translateY(-20px)';
 
         setTimeout(() => {
-            const snd = isLive ? document.getElementById('snd-live') : document.getElementById('snd-blank');
-            if(!isMuted) snd.play();
+            const s = live ? document.getElementById('s_live') : document.getElementById('s_blank');
+            s.currentTime = 0; s.play();
 
-            if (isLive) {
+            if (live) {
                 if (target === 'self') isMe ? state.myHP-- : state.oppHP--;
                 else isMe ? state.oppHP-- : state.myHP--;
             }
             
             setTimeout(() => {
-                gun.style.transform = 'none';
-                
-                // ЛОГИКА ПЕРЕДАЧИ ХОДА:
-                // Если был холостой в себя — ход сохраняется за тем, кто стрелял.
-                if (!isLive && target === 'self') {
-                    state.isMyTurn = isMe;
-                } else {
-                    state.isMyTurn = !isMe;
-                }
-
-                if (state.magazine.length === 0) {
-                    // Конец патронов — можно добавить логику перезарядки
-                    document.getElementById('info').innerText = "ПУСТО. ПЕРЕЗАРЯДКА...";
-                }
-
+                g.style.transform = 'none';
+                state.turn = !isMe || (!live && target === 'self');
                 updateUI();
-                if (state.myHP <= 0 || state.oppHP <= 0) {
-                    alert(state.myHP > 0 ? "ПОБЕДА!" : "ВЫ ПРОИГРАЛИ");
-                    location.reload();
-                }
+                if (state.myHP <= 0 || state.oppHP <= 0) { alert("КОНЕЦ"); location.reload(); }
             }, 600);
         }, 400);
-    }
-
-    function useItem(idx) {
-        if(!state.isMyTurn) return;
-        const item = state.myInv[idx];
-        alert("Использован предмет: " + item);
-        state.myInv.splice(idx, 1);
-        updateUI();
-        // Здесь можно добавить socket.emit('make_move', {type: 'item', item})
     }
 </script>
 </body>
