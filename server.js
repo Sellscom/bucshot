@@ -1,66 +1,79 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+const app = express();
+const http = require('http').Server(app);
+const io = require('socket.io')(http, { cors: { origin: "*" } });
+const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+// --- НАСТРОЙКИ ---
+const TOKEN = '8547285463:AAGlqe57F28QQxQ3zhoViNqXMTVie1JEth8';
+const GAME_URL = 'https://bucshot.onrender.com';
 
-app.use(express.static(__dirname));
+// Раздача статических файлов (твоего index.html)
+app.use(express.static(path.join(__dirname, '/')));
 
+// --- ЛОГИКА ТЕЛЕГРАМ БОТА ---
+const bot = new TelegramBot(TOKEN, { polling: true });
+
+bot.onText(/\/start/, (msg) => {
+    bot.sendMessage(msg.chat.id, "Добро пожаловать в Buckshot Online! Нажми кнопку ниже, чтобы найти оппонента.", {
+        reply_markup: {
+            inline_keyboard: [[
+                { text: "ИГРАТЬ ONLINE", url: GAME_URL }
+            ]]
+        }
+    });
+});
+
+// --- ЛОГИКА МУЛЬТИПЛЕЕРА ---
 let waitingPlayer = null;
 let rooms = {};
 
 io.on('connection', (socket) => {
-    socket.on('find_game', () => {
+    console.log('Игрок подключился:', socket.id);
+
+    socket.on('join_game', () => {
         if (waitingPlayer && waitingPlayer.id !== socket.id) {
             const roomId = `room_${waitingPlayer.id}_${socket.id}`;
             const magazine = generateMagazine();
             
-            rooms[roomId] = {
+            const roomData = {
+                id: roomId,
                 players: [waitingPlayer.id, socket.id],
                 magazine: magazine,
-                hp: [3, 3],
-                turn: 0 
+                turn: waitingPlayer.id
             };
-
+            
+            rooms[roomId] = roomData;
             socket.join(roomId);
             waitingPlayer.join(roomId);
-
-            io.to(roomId).emit('game_ready', {
-                roomId,
-                magazineInfo: {
-                    live: magazine.filter(b => b).length,
-                    blank: magazine.filter(b => !b).length
-                },
-                turnId: waitingPlayer.id
-            });
+            
+            io.to(roomId).emit('start_multiplayer', roomData);
+            console.log(`Комната создана: ${roomId}`);
             waitingPlayer = null;
         } else {
             waitingPlayer = socket;
-            socket.emit('status', 'ПОИСК СОПЕРНИКА...');
+            socket.emit('waiting', 'ПОИСК ОППОНЕНТА...');
         }
     });
 
-    socket.on('shoot_action', (data) => {
-        const room = rooms[data.roomId];
-        if (!room) return;
+    socket.on('make_move', (data) => {
+        socket.to(data.roomId).emit('opponent_move', data);
+    });
 
-        const bullet = room.magazine.shift();
-        io.to(data.roomId).emit('shoot_result', {
-            shooter: socket.id,
-            target: data.target,
-            isLive: bullet,
-            magazineEmpty: room.magazine.length === 0
-        });
+    socket.on('disconnect', () => {
+        if (waitingPlayer === socket) waitingPlayer = null;
     });
 });
 
 function generateMagazine() {
-    let total = Math.floor(Math.random() * 4) + 3;
+    let total = Math.floor(Math.random() * 4) + 5;
     let live = Math.ceil(total / 2);
     return Array(total).fill(false).map((_, i) => i < live).sort(() => Math.random() - 0.5);
 }
 
-server.listen(process.env.PORT || 3000);
+// Запуск сервера
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => {
+    console.log(`Сервер запущен на порту ${PORT}`);
+});
