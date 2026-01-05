@@ -10,41 +10,31 @@ let rooms = {};
 const ITEMS_POOL = ['Beer', 'Knife', 'Cigaretes', 'Handclifs', 'Lighter'];
 
 io.on('connection', (socket) => {
-    io.emit('online_count', io.engine.clientsCount);
-
     socket.on('join_game', (userData) => {
         const playerName = userData?.name || "Игрок";
-
         if (waitingPlayer && waitingPlayer.socket.id !== socket.id) {
             const roomId = `room_${waitingPlayer.socket.id}_${socket.id}`;
             const mag = generateMagazine();
-            const inv1 = generateItems(4);
-            const inv2 = generateItems(4);
+            const p1Inv = generateItems(4);
+            const p2Inv = generateItems(4);
 
             rooms[roomId] = {
                 players: [waitingPlayer.socket.id, socket.id],
+                round: 1,
                 magazine: mag,
-                inventories: { [waitingPlayer.socket.id]: inv1, [socket.id]: inv2 }
+                hp: { [waitingPlayer.socket.id]: 3, [socket.id]: 3 },
+                inv: { [waitingPlayer.socket.id]: p1Inv, [socket.id]: p2Inv }
             };
 
             const p1 = waitingPlayer;
             const p2 = { socket, name: playerName };
+            p1.socket.join(roomId); p2.socket.join(roomId);
 
-            p1.socket.join(roomId);
-            p2.socket.join(roomId);
-
-            io.to(p1.socket.id).emit('start_multiplayer', {
-                id: roomId, magazine: mag, turn: true,
-                myInv: inv1, oppInv: inv2, myName: p1.name, oppName: p2.name
-            });
-            io.to(p2.socket.id).emit('start_multiplayer', {
-                id: roomId, magazine: mag, turn: false,
-                myInv: inv2, oppInv: inv1, myName: p2.name, oppName: p1.name
-            });
+            io.to(p1.socket.id).emit('start_game', { id: roomId, mag, turn: true, myInv: p1Inv, oppInv: p2Inv, oppName: p2.name });
+            io.to(p2.socket.id).emit('start_game', { id: roomId, mag, turn: false, myInv: p2Inv, oppInv: p1Inv, oppName: p1.name });
             waitingPlayer = null;
         } else {
             waitingPlayer = { socket, name: playerName };
-            socket.emit('waiting', 'ПОИСК СОПЕРНИКА...');
         }
     });
 
@@ -54,42 +44,46 @@ io.on('connection', (socket) => {
 
         if (data.type === 'shoot') {
             room.magazine.shift();
+            if (data.bullet) {
+                const targetId = data.target === 'self' ? socket.id : room.players.find(p => p !== socket.id);
+                room.hp[targetId] -= (data.dmg || 1);
+            }
         } else if (data.type === 'item') {
-            const myInv = room.inventories[socket.id];
-            const idx = myInv.indexOf(data.item);
-            if (idx > -1) myInv.splice(idx, 1);
+            const myIdx = room.inv[socket.id].indexOf(data.item);
+            if (myIdx > -1) room.inv[socket.id].splice(myIdx, 1);
             if (data.item === 'Beer') room.magazine.shift();
         }
 
         socket.to(data.roomId).emit('opponent_action', data);
 
-        if (room.magazine.length === 0) {
-            setTimeout(() => {
+        // Проверка смерти и раундов
+        const deadPlayer = room.players.find(p => room.hp[p] <= 0);
+        if (deadPlayer) {
+            room.round++;
+            if (room.round > 3) {
+                const winnerId = room.players.find(p => p !== deadPlayer);
+                io.to(data.roomId).emit('game_over', { winner: winnerId });
+                delete rooms[data.roomId];
+            } else {
+                room.hp = { [room.players[0]]: 3, [room.players[1]]: 3 };
                 const newMag = generateMagazine();
-                const newItems = generateItems(2);
                 room.magazine = newMag;
-                Object.keys(room.inventories).forEach(pid => {
-                    room.inventories[pid] = [...room.inventories[pid], ...newItems].slice(0, 8);
-                });
-                io.to(data.roomId).emit('reload_magazine', { magazine: newMag, newItems });
-            }, 3000);
+                io.to(data.roomId).emit('next_round', { round: room.round, mag: newMag });
+            }
+        } else if (room.magazine.length === 0) {
+            const newMag = generateMagazine();
+            const newItems = generateItems(2);
+            room.magazine = newMag;
+            room.players.forEach(p => room.inv[p] = [...room.inv[p], ...newItems].slice(0, 8));
+            io.to(data.roomId).emit('reload', { mag: newMag, newItems });
         }
-    });
-
-    socket.on('disconnect', () => {
-        if (waitingPlayer && waitingPlayer.socket === socket) waitingPlayer = null;
-        io.emit('online_count', io.engine.clientsCount);
     });
 });
 
 function generateMagazine() {
-    let total = Math.floor(Math.random() * 4) + 3;
-    let live = Math.ceil(total / 2);
-    return Array(total).fill(false).map((_, i) => i < live).sort(() => Math.random() - 0.5);
+    let t = Math.floor(Math.random() * 4) + 3;
+    let l = Math.ceil(t / 2);
+    return Array(t).fill(false).map((_, i) => i < l).sort(() => Math.random() - 0.5);
 }
-
-function generateItems(n) {
-    return Array(n).fill(null).map(() => ITEMS_POOL[Math.floor(Math.random() * ITEMS_POOL.length)]);
-}
-
-http.listen(process.env.PORT || 3000, () => console.log('Server is running'));
+function generateItems(n) { return Array(n).fill(0).map(() => ITEMS_POOL[Math.floor(Math.random() * ITEMS_POOL.length)]); }
+http.listen(process.env.PORT || 3000);
