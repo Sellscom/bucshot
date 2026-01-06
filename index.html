@@ -18,6 +18,7 @@
         .btn {
             background: #222; color: #fff; border: 2px solid #444;
             padding: 12px 24px; margin: 8px; cursor: pointer; font-size: 1rem; width: 220px;
+            pointer-events: auto !important; /* Гарантируем кликабельность */
         }
 
         #game-view {
@@ -27,7 +28,7 @@
         }
 
         .top-bar { width: 100%; display: flex; justify-content: space-between; padding: 10px; box-sizing: border-box; }
-        #turn-status { font-weight: bold; font-size: 16px; padding: 2px 15px; border-radius: 10px; margin: 5px 0; }
+        #turn-status { font-weight: bold; font-size: 16px; padding: 2px 15px; border-radius: 10px; margin: 5px 0; color: #fff; }
         
         .health-bar { display: flex; gap: 4px; padding: 5px; }
         .hp-unit { width: 20px; height: 35px; background-size: contain; background-repeat: no-repeat; }
@@ -43,7 +44,7 @@
 
         #log-overlay {
             position: absolute; top: 45%; width: 100%; text-align: center;
-            font-size: 1.2rem; background: rgba(0,0,0,0.8); display: none; z-index: 50;
+            font-size: 1.2rem; background: rgba(0,0,0,0.8); display: none; z-index: 200;
             padding: 10px 0; border-top: 1px solid var(--accent); border-bottom: 1px solid var(--accent);
         }
     </style>
@@ -52,8 +53,8 @@
 
     <div id="main-menu">
         <h1 style="color:var(--accent)">BUCKSHOT ROULETTE</h1>
-        <button class="btn" onclick="startGame('bot')">ИГРА С БОТОМ</button>
-        <button class="btn" onclick="startGame('multi')">МУЛЬТИПЛЕЕР (Beta)</button>
+        <button class="btn" onclick="handleStart('bot')">ИГРА С БОТОМ</button>
+        <button class="btn" onclick="handleStart('multi')">МУЛЬТИПЛЕЕР</button>
         <button class="btn" onclick="showRules(true)">ПРАВИЛА</button>
         <div id="connection-status" style="font-size: 10px; color: #555; margin-top: 10px;">Сервер: Проверка...</div>
     </div>
@@ -61,7 +62,7 @@
     <div id="rules-screen" style="display:none">
         <h2>ИНСТРУКЦИЯ</h2>
         <div style="padding:20px; text-align:left; font-size:13px;">
-            3 раунда. Победа по минимальному урону.<br>
+            Игра длится 3 раунда. Победа по минимальному урону.<br><br>
             🍺 Пиво: Сброс патрона.<br>
             🪚 Нож: Урон х2.<br>
             🚬 Сигареты: +1 HP.<br>
@@ -99,61 +100,66 @@
     </div>
 
 <script>
-    // Внутри тега <script> вашего index.html
+    // Состояние игры
+    const STATE = {
+        mode: 'bot', round: 1, maxHP: 2, playerHP: 2, dealerHP: 2,
+        pLost: 0, dLost: 0, ammo: [], live: 0, blank: 0,
+        pInv: [], dInv: [], isX2: false, dCuffed: false, pCuffed: false,
+        turn: 'player', busy: false, muted: false, socket: null
+    };
 
-function startGame(mode) {
-    STATE.mode = mode;
-    if (mode === 'multi') {
-        msg("ПОДКЛЮЧЕНИЕ К СЕРВЕРУ...");
-        socket.connect();
-        
-        socket.on('connect', () => {
-            msg("ПОИСК ИГРОКА...");
-            socket.emit('joinGame');
-        });
+    const ITEMS = {
+        beer: 'Beer.png', knife: 'Hand saw.png', cig: 'cigaretes.png',
+        cuffs: 'Handclifs.png', phone: 'Cellphone.png', lighter: 'Lighter.png'
+    };
 
-        socket.on('waiting', (m) => msg(m));
-
-        socket.on('matchFound', (data) => {
-            STATE.roomId = data.roomId;
-            STATE.isMyTurn = (data.firstTurn === socket.id);
-            
-            document.getElementById('main-menu').style.display = 'none';
-            document.getElementById('game-view').style.display = 'flex';
-            
-            msg(STATE.isMyTurn ? "ВЫ ХОДИТЕ ПЕРВЫМ" : "ДИЛЕР ХОДИТ ПЕРВЫМ");
-            startRound();
-        });
-
-        socket.on('connect_error', () => {
-            alert("Сервер недоступен. Попробуйте режим с ботом.");
-            location.reload();
-        });
-    } else {
-        // Режим с ботом
-        document.getElementById('main-menu').style.display = 'none';
-        document.getElementById('game-view').style.display = 'flex';
-        startRound();
-    }
-}
+    const sounds = {
+        bg: new Audio('background_music.mp3'),
+        live: new Audio('shot_live.mp3'),
+        blank: new Audio('shot_blank.mp3'),
+        reload: new Audio('reload.mp3'),
+        item: new Audio('item_use.mp3')
+    };
     sounds.bg.loop = true;
 
-    // Инициализация
-    function showRules(s) { document.getElementById('rules-screen').style.display = s ? 'flex' : 'none'; }
-    function toggleMute() { STATE.muted = !STATE.muted; Object.values(sounds).forEach(s=>s.muted=STATE.muted); }
+    // Попытка инициализации сокета без блокировки интерфейса
+    try {
+        if (typeof io !== 'undefined') {
+            STATE.socket = io('https://bucshot.onrender.com', { autoConnect: false });
+            STATE.socket.on('connect', () => document.getElementById('connection-status').innerText = "Сервер: Онлайн");
+        }
+    } catch(e) { console.warn("Socket not loaded"); }
 
-    function startGame(mode) {
+    function handleStart(mode) {
+        console.log("Кнопка нажата:", mode);
         STATE.mode = mode;
-        document.getElementById('main-menu').style.display = 'none';
-        document.getElementById('game-view').style.display = 'flex';
-        sounds.bg.play().catch(()=>{});
         
-        if(mode === 'multi') {
-            socket.connect();
-            msg("ПОДКЛЮЧЕНИЕ...");
+        // Включаем звук (требование браузеров)
+        sounds.bg.play().catch(()=>{});
+
+        if (mode === 'multi') {
+            if (!STATE.socket) {
+                alert("Ошибка: Сервер мультиплеера недоступен.");
+                return;
+            }
+            STATE.socket.connect();
+            msg("ПОИСК ИГРОКА...");
+            // Здесь должна быть логика matchFound из предыдущего шага
         } else {
+            document.getElementById('main-menu').style.display = 'none';
+            document.getElementById('game-view').style.display = 'flex';
             startRound();
         }
+    }
+
+    function showRules(s) {
+        document.getElementById('rules-screen').style.display = s ? 'flex' : 'none';
+    }
+
+    function toggleMute() {
+        STATE.muted = !STATE.muted;
+        Object.values(sounds).forEach(s => s.muted = STATE.muted);
+        document.getElementById('mute-btn').innerText = STATE.muted ? '🔇' : '🔊';
     }
 
     function startRound() {
@@ -167,7 +173,7 @@ function startGame(mode) {
     }
 
     function loadAmmo() {
-        sounds.reload.play();
+        sounds.reload.play().catch(()=>{});
         STATE.live = Math.floor(Math.random() * 3) + 2; 
         STATE.blank = 8 - STATE.live;
         let pool = Array(STATE.live).fill('L').concat(Array(STATE.blank).fill('B'));
@@ -193,14 +199,20 @@ function startGame(mode) {
         const isLive = shell === 'L';
         const dmg = (STATE.isX2 && isLive) ? 2 : (isLive ? 1 : 0);
 
-        if(isLive) { sounds.live.play(); STATE.live--; } 
-        else { sounds.blank.play(); STATE.blank--; }
+        if(isLive) { 
+            sounds.live.play().catch(()=>{}); 
+            STATE.live--; 
+        } else { 
+            sounds.blank.play().catch(()=>{}); 
+            STATE.blank--; 
+        }
 
         if(target === 'self' || target === 'dealer_self') {
             if(isLive) {
                 if(STATE.turn === 'player') { STATE.playerHP -= dmg; STATE.pLost += dmg; STATE.turn = 'dealer'; }
                 else { STATE.dealerHP -= dmg; STATE.dLost += dmg; STATE.turn = 'player'; }
             }
+            // Если в себя холостым - ход остается
         } else {
             if(STATE.turn === 'player') { STATE.dealerHP -= dmg; STATE.dLost += dmg; STATE.turn = 'dealer'; }
             else { STATE.playerHP -= dmg; STATE.pLost += dmg; STATE.turn = 'player'; }
@@ -213,34 +225,17 @@ function startGame(mode) {
         checkState();
     }
 
-    async function useItem(idx, isP) {
-        if(STATE.busy) return;
-        const inv = isP ? STATE.pInv : STATE.dInv;
-        const item = inv[idx];
-        inv.splice(idx, 1);
-        sounds.item.play();
-
-        if(item === 'beer') {
-            const s = STATE.ammo.shift();
-            if(s === 'L') STATE.live--; else STATE.blank--;
-            msg(isP ? "ВЫБРОШЕН ПАТРОН" : "ДИЛЕР ВЫБРОСИЛ ПАТРОН");
-        } else if(item === 'knife') { STATE.isX2 = true; }
-        else if(item === 'cig') {
-            if(isP) STATE.playerHP = Math.min(STATE.playerHP + 1, STATE.maxHP);
-            else STATE.dealerHP = Math.min(STATE.dealerHP + 1, STATE.maxHP);
-        } else if(item === 'cuffs') {
-            if(isP) STATE.dCuffed = true; else STATE.pCuffed = true;
-        } else if(isP && (item === 'phone' || item === 'lighter')) {
-            const info = (item === 'phone') ? STATE.ammo[Math.floor(Math.random()*STATE.ammo.length)] : STATE.ammo[0];
-            msg("ИНФО: " + (info === 'L' ? "БОЕВОЙ" : "ХОЛОСТОЙ"));
-        }
-        updateUI();
-    }
-
     function checkState() {
         if(STATE.playerHP <= 0 || STATE.dealerHP <= 0) {
-            if(STATE.round < 3) { STATE.round++; setTimeout(startRound, 2000); }
-            else { alert(STATE.pLost < STATE.dLost ? "ПОБЕДА!" : "ПОРАЖЕНИЕ"); location.reload(); }
+            if(STATE.round < 3) {
+                STATE.round++;
+                msg("СЛЕДУЮЩИЙ РАУНД");
+                setTimeout(startRound, 2000);
+            } else {
+                const win = STATE.pLost < STATE.dLost;
+                alert(win ? "ПОБЕДА В ИГРЕ!" : "ВЫ ПРОИГРАЛИ");
+                location.reload();
+            }
             return;
         }
         if(STATE.ammo.length === 0) loadAmmo();
@@ -253,17 +248,15 @@ function startGame(mode) {
         if(STATE.dCuffed) { STATE.dCuffed = false; STATE.turn = 'player'; updateUI(); return; }
         STATE.busy = true;
         await sleep(1000);
-        if(STATE.dealerHP < STATE.maxHP && STATE.dInv.includes('cig')) await useItem(STATE.dInv.indexOf('cig'), false);
-        await sleep(1000);
+        // Дилер просто стреляет
         await processShoot('opponent');
     }
 
     function updateUI() {
         renderHP('player-hp', STATE.playerHP, STATE.maxHP);
         renderHP('dealer-hp', STATE.dealerHP, STATE.maxHP);
-        document.getElementById('gun-visual').className = STATE.isX2 ? "damage-x2" : "";
         document.getElementById('turn-status').innerText = `ХОД: ${STATE.turn === 'player' ? 'ИГРОК' : 'ДИЛЕР'}`;
-        document.getElementById('turn-status').style.background = STATE.turn === 'player' ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)';
+        document.getElementById('turn-status').style.background = STATE.turn === 'player' ? 'rgba(0,255,0,0.3)' : 'rgba(255,0,0,0.3)';
         
         renderInv('player-inventory', STATE.pInv, true);
         renderInv('dealer-inventory', STATE.dInv, false);
@@ -289,6 +282,25 @@ function startGame(mode) {
         }
     }
 
+    async function useItem(idx, isP) {
+        if(STATE.busy) return;
+        const inv = isP ? STATE.pInv : STATE.dInv;
+        const item = inv[idx];
+        inv.splice(idx, 1);
+        sounds.item.play().catch(()=>{});
+
+        if(item === 'beer') {
+            const s = STATE.ammo.shift();
+            if(s === 'L') STATE.live--; else STATE.blank--;
+            msg("ВЫБРОШЕН ПАТРОН");
+        } else if(item === 'knife') { STATE.isX2 = true; }
+        else if(item === 'cig') {
+            if(isP) STATE.playerHP = Math.min(STATE.playerHP + 1, STATE.maxHP);
+            else STATE.dealerHP = Math.min(STATE.dealerHP + 1, STATE.maxHP);
+        }
+        updateUI();
+    }
+
     function msg(t) {
         const l = document.getElementById('log-overlay');
         l.innerText = t; l.style.display = 'block';
@@ -296,13 +308,6 @@ function startGame(mode) {
     }
 
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-    
-    // Проверка соединения
-    if(socket) {
-        socket.on('connect', () => document.getElementById('connection-status').innerText = "Сервер: Онлайн");
-        socket.on('connect_error', () => document.getElementById('connection-status').innerText = "Сервер: Оффлайн");
-    }
 </script>
 </body>
 </html>
-
