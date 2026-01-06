@@ -99,31 +99,43 @@
     </div>
 
 <script>
-    // Настройки сервера
-    let socket;
-    try {
-        socket = io('https://bucshot.onrender.com', { autoConnect: false });
-    } catch(e) { console.error("Socket error"); }
+    // Внутри тега <script> вашего index.html
 
-    const STATE = {
-        mode: 'bot', round: 1, maxHP: 2, playerHP: 2, dealerHP: 2,
-        pLost: 0, dLost: 0, ammo: [], live: 0, blank: 0,
-        pInv: [], dInv: [], isX2: false, dCuffed: false, pCuffed: false,
-        turn: 'player', busy: false, muted: false
-    };
+function startGame(mode) {
+    STATE.mode = mode;
+    if (mode === 'multi') {
+        msg("ПОДКЛЮЧЕНИЕ К СЕРВЕРУ...");
+        socket.connect();
+        
+        socket.on('connect', () => {
+            msg("ПОИСК ИГРОКА...");
+            socket.emit('joinGame');
+        });
 
-    const ITEMS = {
-        beer: 'Beer.png', knife: 'Hand saw.png', cig: 'cigaretes.png',
-        cuffs: 'Handclifs.png', phone: 'Cellphone.png', lighter: 'Lighter.png'
-    };
+        socket.on('waiting', (m) => msg(m));
 
-    const sounds = {
-        bg: new Audio('background_music.mp3'),
-        live: new Audio('shot_live.mp3'),
-        blank: new Audio('shot_blank.mp3'),
-        reload: new Audio('reload.mp3'),
-        item: new Audio('item_use.mp3')
-    };
+        socket.on('matchFound', (data) => {
+            STATE.roomId = data.roomId;
+            STATE.isMyTurn = (data.firstTurn === socket.id);
+            
+            document.getElementById('main-menu').style.display = 'none';
+            document.getElementById('game-view').style.display = 'flex';
+            
+            msg(STATE.isMyTurn ? "ВЫ ХОДИТЕ ПЕРВЫМ" : "ДИЛЕР ХОДИТ ПЕРВЫМ");
+            startRound();
+        });
+
+        socket.on('connect_error', () => {
+            alert("Сервер недоступен. Попробуйте режим с ботом.");
+            location.reload();
+        });
+    } else {
+        // Режим с ботом
+        document.getElementById('main-menu').style.display = 'none';
+        document.getElementById('game-view').style.display = 'flex';
+        startRound();
+    }
+}
     sounds.bg.loop = true;
 
     // Инициализация
@@ -293,3 +305,4 @@
 </script>
 </body>
 </html>
+
