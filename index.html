@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Buckshot Roulette: Final PNG Edition</title>
+    <title>Buckshot Roulette: Final Edition</title>
     <style>
         body { margin: 0; padding: 0; background: #050505; color: #fff; font-family: 'Courier New', Courier, monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; }
         
@@ -19,23 +19,23 @@
         .hp-icon { width: 22px; height: 32px; object-fit: contain; }
         
         #central-area { position: relative; z-index: 5; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .status-text { background: rgba(0,0,0,0.95); padding: 10px; margin: 10px; border: 1px solid #5d3a1a; font-size: 14px; text-align: center; width: 85%; min-height: 45px; display: flex; align-items: center; justify-content: center; }
+        .status-text { background: rgba(0,0,0,0.95); padding: 10px; margin: 10px; border: 1px solid #5d3a1a; font-size: 14px; text-align: center; width: 85%; min-height: 60px; display: flex; align-items: center; justify-content: center; color: #0f0; box-shadow: inset 0 0 10px #000; }
         
         #gun-img { width: 75%; z-index: 6; transition: transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
-        .flash { position: absolute; width: 100px; height: 100px; background: radial-gradient(circle, #ffaa00 0%, transparent 70%); opacity: 0; pointer-events: none; z-index: 7; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .flash { position: absolute; width: 150px; height: 150px; background: radial-gradient(circle, #ffaa00 0%, transparent 70%); opacity: 0; pointer-events: none; z-index: 7; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
         .inventory { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; background: rgba(0,0,0,0.95); justify-content: center; border-top: 2px solid #5d3a1a; min-height: 60px; z-index: 5; }
         .item-btn { width: 48px; height: 48px; border: 1px solid #5d3a1a; background-size: contain; background-repeat: no-repeat; background-position: center; cursor: pointer; background-color: #111; }
         
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; background: #000; z-index: 5; }
         .action-btn { padding: 16px; border: 1px solid #5d3a1a; background: #1a1a1a; color: #fff; cursor: pointer; font-family: inherit; font-weight: bold; text-transform: uppercase; }
-        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .action-btn:disabled { opacity: 0.3; filter: grayscale(1); cursor: not-allowed; }
 
         /* АНИМАЦИИ */
-        .shake-effect { animation: shake 0.2s ease-in-out; }
-        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-8px, 4px); } 50% { transform: translate(8px, -4px); } }
-        .flash-active { animation: fire-flash 0.15s ease-out forwards; }
-        @keyframes fire-flash { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2.5); } }
+        .shake-effect { animation: shake 0.25s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-10px, 5px); } 50% { transform: translate(10px, -5px); } }
+        .flash-active { animation: fire-flash 0.2s ease-out forwards; }
+        @keyframes fire-flash { 0% { opacity: 1; scale: 1; } 100% { opacity: 0; scale: 3; } }
     </style>
 </head>
 <body>
@@ -48,27 +48,30 @@
 
     <div id="main-menu">
         <div style="font-size: 32px; color: #8b5a2b; margin-bottom: 40px; text-align: center;">BUCKSHOT<br>ROULETTE</div>
-        <button id="continue-btn" class="action-btn" style="width: 260px; display:none; margin-bottom: 10px;" onclick="resumeGame()">ПРОДОЛЖИТЬ</button>
-        <button class="action-btn" style="width: 260px; margin-bottom: 10px;" onclick="startGame(true)">НОВАЯ ИГРА</button>
-        <button class="action-btn" style="width: 260px;" onclick="toggleRules(true)">ПРАВИЛА</button>
+        <button class="action-btn" style="width: 260px; margin-bottom: 10px;" onclick="startGame()">НОВАЯ ИГРА</button>
+        <button class="action-btn" style="width: 260px;" onclick="toggleRules(true)">АРСЕНАЛ</button>
     </div>
 
     <div id="game-outer-border">
         <div id="flash-effect" class="flash"></div>
+        
         <div id="end-screen" style="display: none;">
-            <h1 id="result-title">РЕЗУЛЬТАТ</h1>
-            <p id="result-stats"></p>
-            <button class="action-btn" onclick="resetAndMenu()">В МЕНЮ</button>
+            <h1 id="result-title" style="font-size: 40px; margin-bottom: 20px;"></h1>
+            <div id="result-stats" style="text-align: center; color: #ccc; line-height: 1.8; margin-bottom: 30px; border: 1px solid #5d3a1a; padding: 20px; background: #0a0a0a;"></div>
+            <button class="action-btn" style="width: 220px;" onclick="location.reload()">В МЕНЮ</button>
         </div>
+
         <div id="game-container" style="display: contents;">
             <img src="Game_Table.png" id="table-bg">
             <div class="health-bar" id="dealer-hp-bar"></div>
+            
             <div id="central-area">
-                <div id="round-display" style="color: #8b5a2b; font-weight: bold;">РАУНД 1 / 3</div>
-                <div id="ammo-counter" style="color: #0f0; font-size: 12px; margin: 5px;">ЗАРЯЖЕНО: 0/8</div>
+                <div id="round-display" style="color: #8b5a2b; font-weight: bold; font-size: 18px;">РАУНД 1 / 3</div>
+                <div id="ammo-counter" style="color: #666; font-size: 11px; margin: 5px;">ВЫСТРЕЛЫ: 0 | ВСЕГО: 0</div>
                 <div id="info" class="status-text">ПОДГОТОВКА...</div>
                 <img src="Gun.png" id="gun-img">
             </div>
+
             <div>
                 <div id="inventory" class="inventory"></div>
                 <div class="health-bar" id="player-hp-bar" style="border-top:1px solid #5d3a1a;"></div>
@@ -81,8 +84,8 @@
     </div>
 
     <div id="rules-modal">
-        <h2 style="color: #8b5a2b;">ПРАВИЛА</h2>
-        <div id="rules-list" style="width: 100%; max-width: 400px;"></div>
+        <h2 style="color: #8b5a2b;">ОПИСАНИЕ ПРЕДМЕТОВ</h2>
+        <div id="rules-list" style="width: 100%; max-width: 400px; font-size: 12px;"></div>
         <button class="action-btn" style="width: 200px; margin-top: 20px;" onclick="toggleRules(false)">НАЗАД</button>
     </div>
 
@@ -95,12 +98,12 @@
 
     let state = {
         round: 1, maxRounds: 3, playerHP: 3, dealerHP: 3, maxHP: 3,
-        playerDamageDealt: 0, dealerDamageDealt: 0,
-        magazine: [], shotsFired: 0, isPlayerTurn: true, 
-        inventory: [], isKnife: false, isCuffed: false, gameActive: false
+        playerDamageDealt: 0, dealerDamageDealt: 0, totalShotsFired: 0,
+        magazine: [], currentShots: 0, isPlayerTurn: true, inventory: [], 
+        isKnife: false, isCuffed: false, gameActive: false
     };
 
-    const snd = {
+    const audio = {
         bg: document.getElementById('snd-bg'),
         live: document.getElementById('snd-live'),
         blank: document.getElementById('snd-blank'),
@@ -108,30 +111,14 @@
         item: document.getElementById('snd-item')
     };
 
-    function playSnd(name) {
-        try {
-            snd[name].currentTime = 0;
-            snd[name].play();
-        } catch(e) {}
-    }
+    function playSnd(name) { try { audio[name].currentTime = 0; audio[name].play(); } catch(e) {} }
 
-    function startGame(isNew) {
-        snd.bg.volume = 0.3;
-        snd.bg.play().catch(() => {});
-        
-        if (isNew) {
-            state = {
-                round: 1, maxRounds: 3, playerHP: 3, dealerHP: 3, maxHP: 3,
-                playerDamageDealt: 0, dealerDamageDealt: 0,
-                magazine: [], shotsFired: 0, isPlayerTurn: true, 
-                inventory: [], isKnife: false, isCuffed: false, gameActive: true
-            };
-            initRound();
-        }
-        
+    function startGame() {
+        audio.bg.volume = 0.2; audio.bg.play().catch(() => {});
+        state = { round: 1, maxRounds: 3, playerHP: 3, dealerHP: 3, maxHP: 3, playerDamageDealt: 0, dealerDamageDealt: 0, totalShotsFired: 0, magazine: [], currentShots: 0, isPlayerTurn: true, inventory: [], isKnife: false, isCuffed: false, gameActive: true };
         document.getElementById('main-menu').style.display = 'none';
         document.getElementById('game-outer-border').style.display = 'flex';
-        updateUI();
+        initRound();
     }
 
     function initRound() {
@@ -139,62 +126,86 @@
         state.maxHP = state.round + 2;
         state.playerHP = state.maxHP;
         state.dealerHP = state.maxHP;
-        state.inventory = [];
-        state.shotsFired = 0;
         state.isPlayerTurn = true;
+        state.isKnife = false;
+        state.isCuffed = false;
         generateMagazine();
         giveItems(state.round + 1);
         updateUI();
-        document.getElementById('info').innerText = "РАУНД " + state.round + ". ВАШ ХОД.";
+        document.getElementById('info').innerText = "РАУНД " + state.round + ". ВАШ ХОД";
     }
 
     function generateMagazine() {
         state.magazine = [];
-        let live = Math.floor(Math.random() * 3) + 2;
-        for(let i=0; i<8; i++) state.magazine.push(i < live);
+        let total = Math.floor(Math.random() * 4) + 3;
+        let liveCount = Math.ceil(total / 2);
+        for(let i=0; i<total; i++) state.magazine.push(i < liveCount);
         state.magazine.sort(() => Math.random() - 0.5);
+        state.currentShots = 0;
     }
 
     function updateUI() {
-        // Отрисовка жизней
         const drawHP = (id, cur) => {
-            const el = document.getElementById(id);
-            el.innerHTML = '';
+            const el = document.getElementById(id); el.innerHTML = '';
             for(let i=0; i<state.maxHP; i++) {
                 const img = document.createElement('img');
                 img.src = i < cur ? IMGS.hpFull : IMGS.hpEmpty;
-                img.className = 'hp-icon';
-                el.appendChild(img);
+                img.className = 'hp-icon'; el.appendChild(img);
             }
         };
         drawHP('player-hp-bar', state.playerHP);
         drawHP('dealer-hp-bar', state.dealerHP);
 
-        // Инвентарь
-        const inv = document.getElementById('inventory');
-        inv.innerHTML = '';
+        const inv = document.getElementById('inventory'); inv.innerHTML = '';
         state.inventory.forEach((item, idx) => {
             const div = document.createElement('div');
-            div.className = 'item-btn';
-            div.style.backgroundImage = `url('${IMGS[item]}')`;
-            div.onclick = () => useItem(item, idx);
-            inv.appendChild(div);
+            div.className = 'item-btn'; div.style.backgroundImage = `url('${IMGS[item]}')`;
+            div.onclick = () => useItem(item, idx); inv.appendChild(div);
         });
 
+        document.getElementById('ammo-counter').innerText = `В ПАЧКЕ: ${state.magazine.length} | ВСЕГО ВЫСТРЕЛОВ: ${state.totalShotsFired}`;
         document.getElementById('round-display').innerText = `РАУНД ${state.round} / 3`;
-        document.getElementById('ammo-counter').innerText = `ОТСТРЕЛЯНО: ${state.shotsFired} / 8`;
-        
-        // Блокировка кнопок, если не ход игрока
         document.getElementById('btn-self').disabled = !state.isPlayerTurn;
         document.getElementById('btn-opp').disabled = !state.isPlayerTurn;
     }
 
-    function shoot(target) {
-        if (!state.isPlayerTurn || state.magazine.length === 0) return;
+    function useItem(type, idx) {
+        if (!state.isPlayerTurn) return;
+        playSnd('item');
+        state.inventory.splice(idx, 1);
+        let info = document.getElementById('info');
         
-        state.isPlayerTurn = false; // Блокируем сразу
+        if (type === 'Cigaretes') {
+            state.playerHP = Math.min(state.playerHP + 1, state.maxHP);
+            info.innerText = "СИГАРЕТЫ: +1 ЖИЗНЬ";
+        } else if (type === 'Beer') {
+            const popped = state.magazine.shift();
+            state.totalShotsFired++;
+            playSnd('reload');
+            info.innerText = "ПИВО: ВЫБРОШЕН " + (popped ? "БОЕВОЙ" : "ХОЛОСТОЙ");
+        } else if (type === 'Knife') {
+            state.isKnife = true;
+            info.innerText = "НОЖ: СТВОЛ ОТПИЛЕН (УРОН x2)";
+        } else if (type === 'Handclifs') {
+            state.isCuffed = true;
+            info.innerText = "НАРУЧНИКИ: ДИЛЕР ПРОПУСТИТ ХОД";
+        } else if (type === 'Lighter') {
+            info.innerText = "ЗАЖИГАЛКА: В СТВОЛЕ " + (state.magazine[0] ? "БОЕВОЙ" : "ХОЛОСТОЙ");
+        } else if (type === 'Cellphone') {
+            let rIdx = Math.floor(Math.random() * state.magazine.length);
+            info.innerText = "ТЕЛЕФОН: ПАТРОН №" + (rIdx + 1) + " — " + (state.magazine[rIdx] ? "БОЕВОЙ" : "ХОЛОСТОЙ");
+        }
+        updateUI();
+        checkGameState();
+    }
+
+    function shoot(target) {
+        if (!state.isPlayerTurn) return;
+        state.isPlayerTurn = false;
+        updateUI();
+
         const isLive = state.magazine.shift();
-        state.shotsFired++;
+        state.totalShotsFired++;
         const dmg = isLive ? (state.isKnife ? 2 : 1) : 0;
         const gun = document.getElementById('gun-img');
 
@@ -207,104 +218,114 @@
                 document.getElementById('flash-effect').classList.add('flash-active');
                 if (target === 'self') { state.playerHP -= dmg; state.dealerDamageDealt += dmg; }
                 else { state.dealerHP -= dmg; state.playerDamageDealt += dmg; }
-                setTimeout(() => {
-                    document.getElementById('game-outer-border').classList.remove('shake-effect');
-                    document.getElementById('flash-effect').classList.remove('flash-active');
-                }, 300);
+                document.getElementById('info').innerText = "БАБАХ! БОЕВОЙ!";
             } else {
                 playSnd('blank');
+                document.getElementById('info').innerText = "ЩЕЛЧОК. ХОЛОСТОЙ.";
             }
 
             setTimeout(() => {
                 gun.style.transform = 'none';
+                document.getElementById('game-outer-border').classList.remove('shake-effect');
+                document.getElementById('flash-effect').classList.remove('flash-active');
                 state.isKnife = false;
                 
-                if (!isLive && target === 'self') {
+                if (state.playerHP <= 0 || state.dealerHP <= 0) {
+                    checkGameState();
+                } else if (!isLive && target === 'self') {
                     state.isPlayerTurn = true;
-                    document.getElementById('info').innerText = "ХОЛОСТОЙ. ВАШ ХОД.";
+                    document.getElementById('info').innerText = "ХОЛОСТОЙ В СЕБЯ! ВАШ ХОД ПРОДОЛЖАЕТСЯ";
                     updateUI();
                 } else {
-                    document.getElementById('info').innerText = isLive ? "ПОПАДАНИЕ!" : "ОСЕЧКА.";
                     setTimeout(dealerTurn, 1000);
                 }
-                checkGameState();
-            }, 400);
+            }, 500);
         }, 400);
     }
 
     function dealerTurn() {
+        if (!state.gameActive || state.playerHP <= 0 || state.dealerHP <= 0) return;
         if (state.magazine.length === 0) { checkGameState(); return; }
+        
         if (state.isCuffed) {
-            state.isCuffed = false;
-            state.isPlayerTurn = true;
-            document.getElementById('info').innerText = "ДИЛЕР СКОВАН. ВАШ ХОД.";
-            updateUI();
-            return;
+            state.isCuffed = false; state.isPlayerTurn = true;
+            document.getElementById('info').innerText = "ДИЛЕР СКОВАН И МОЛЧИТ. ВАШ ХОД";
+            updateUI(); return;
         }
 
+        document.getElementById('info').innerText = "ДИЛЕР ЦЕЛИТСЯ...";
         const isLive = state.magazine.shift();
-        state.shotsFired++;
-        document.getElementById('gun-img').style.transform = 'translateY(-20px) scale(0.9)';
-
+        state.totalShotsFired++;
+        
         setTimeout(() => {
-            if (isLive) {
-                playSnd('live');
-                state.playerHP--;
-                state.dealerDamageDealt++;
-                document.getElementById('game-outer-border').classList.add('shake-effect');
-            } else {
-                playSnd('blank');
-            }
-            
+            document.getElementById('gun-img').style.transform = 'translateY(-20px) scale(0.9)';
             setTimeout(() => {
-                document.getElementById('gun-img').style.transform = 'none';
-                document.getElementById('game-outer-border').classList.remove('shake-effect');
-                state.isPlayerTurn = true;
-                document.getElementById('info').innerText = "ХОД ПЕРЕШЕЛ К ВАМ.";
-                checkGameState();
-            }, 400);
+                if (isLive) {
+                    playSnd('live'); state.playerHP--; state.dealerDamageDealt++;
+                    document.getElementById('game-outer-border').classList.add('shake-effect');
+                } else { playSnd('blank'); }
+                
+                setTimeout(() => {
+                    document.getElementById('gun-img').style.transform = 'none';
+                    document.getElementById('game-outer-border').classList.remove('shake-effect');
+                    state.isPlayerTurn = true;
+                    document.getElementById('info').innerText = isLive ? "ДИЛЕР ПОПАЛ В ВАС!" : "ДИЛЕРУ НЕ ПОВЕЗЛО, ХОЛОСТОЙ";
+                    checkGameState();
+                }, 400);
+            }, 600);
         }, 800);
-    }
-
-    function useItem(type, idx) {
-        if (!state.isPlayerTurn) return;
-        playSnd('item');
-        state.inventory.splice(idx, 1);
-        if (type === 'Cigaretes') state.playerHP = Math.min(state.playerHP + 1, state.maxHP);
-        if (type === 'Beer') { state.magazine.shift(); state.shotsFired++; playSnd('reload'); }
-        if (type === 'Knife') state.isKnife = true;
-        if (type === 'Handclifs') state.isCuffed = true;
-        updateUI();
     }
 
     function checkGameState() {
         updateUI();
         if (state.playerHP <= 0 || state.dealerHP <= 0) {
-            if (state.round < state.maxRounds) {
+            if (state.playerHP > 0 && state.round < state.maxRounds) {
+                state.isPlayerTurn = false;
+                document.getElementById('info').innerText = "ДИЛЕР ПОВЕРЖЕН! СЛЕДУЮЩИЙ РАУНД...";
                 state.round++;
-                setTimeout(initRound, 1500);
+                setTimeout(initRound, 2000);
             } else {
+                state.gameActive = false;
                 showEnd();
             }
         } else if (state.magazine.length === 0) {
-            setTimeout(() => { generateMagazine(); giveItems(2); playSnd('reload'); updateUI(); }, 1000);
+            state.isPlayerTurn = false;
+            document.getElementById('info').innerText = "ПАУЗА: НОВАЯ ЗАРЯДКА...";
+            setTimeout(() => { generateMagazine(); giveItems(2); playSnd('reload'); state.isPlayerTurn = true; updateUI(); }, 1500);
         }
     }
 
     function showEnd() {
-        const win = state.playerDamageDealt > state.dealerDamageDealt;
+        const win = state.playerHP > 0;
         document.getElementById('end-screen').style.display = 'flex';
-        document.getElementById('result-title').innerText = win ? "ПОБЕДА!" : "ПРОИГРЫШ";
-        document.getElementById('result-stats').innerHTML = `УРОН ДИЛЕРУ: ${state.playerDamageDealt}<br>УРОН ВАМ: ${state.dealerDamageDealt}`;
+        const title = document.getElementById('result-title');
+        title.innerText = win ? "ВЫ ВЫЖИЛИ" : "ВЫ ПРОИГРАЛИ";
+        title.style.color = win ? "#0f0" : "#f00";
+        document.getElementById('result-stats').innerHTML = `
+            УРОН ДИЛЕРУ: ${state.playerDamageDealt}<br>
+            УРОН ВАМ: ${state.dealerDamageDealt}<br>
+            <span style="color:#8b5a2b">ОТСТРЕЛЯНО ПАТРОНОВ: ${state.totalShotsFired}</span><br>
+            РАУНДОВ ПРОЙДЕНО: ${state.round}
+        `;
     }
 
     function giveItems(n) {
-        const pool = Object.keys(IMGS).slice(0,6);
+        const pool = ['Beer', 'Knife', 'Cigaretes', 'Handclifs', 'Cellphone', 'Lighter'];
         for(let i=0; i<n; i++) if(state.inventory.length < 8) state.inventory.push(pool[Math.floor(Math.random()*pool.length)]);
     }
 
-    function resetAndMenu() { location.reload(); }
-    function toggleRules(s) { document.getElementById('rules-modal').style.display = s ? 'flex' : 'none'; }
+    function toggleRules(s) {
+        const modal = document.getElementById('rules-modal');
+        if (s) {
+            const list = document.getElementById('rules-list'); list.innerHTML = '';
+            const help = { 'Beer': 'Выбрасывает патрон', 'Knife': 'Урон x2', 'Cigaretes': '+1 ОЗ', 'Handclifs': 'Пропуск хода', 'Cellphone': 'Узнать любой патрон', 'Lighter': 'Узнать текущий' };
+            Object.entries(help).forEach(([k,v]) => {
+                list.innerHTML += `<div style="display:flex;align-items:center;margin:8px;border:1px solid #5d3a1a;padding:5px;background:#111;">
+                    <img src="${IMGS[k]}" style="width:30px;margin-right:10px;"><b>${k}:</b> ${v}</div>`;
+            });
+            modal.style.display = 'flex';
+        } else modal.style.display = 'none';
+    }
 </script>
 </body>
 </html>
